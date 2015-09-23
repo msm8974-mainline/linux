@@ -524,8 +524,8 @@ struct msm_gpu *a3xx_gpu_init(struct drm_device *dev)
 		 * implement a cmdstream validator.
 		 */
 		dev_err(dev->dev, "No memory protection without IOMMU\n");
-		ret = -ENXIO;
-		goto fail;
+//		ret = -ENXIO;
+//		goto fail;
 	}
 
 	return gpu;
