@@ -25,6 +25,11 @@ config QCOM_MDT_LOADER
 	tristate
 	select QCOM_SCM
 
+config QCOM_OCMEM
+	tristate "Qualcomm OCMEM driver"
+	help
+	  Allocator for OCMEM (On Chip MEMory).
+
 config QCOM_PM
 	bool "Qualcomm Power Management"
 	depends on ARCH_QCOM && !ARM64
