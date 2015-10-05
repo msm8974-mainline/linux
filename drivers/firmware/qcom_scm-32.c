@@ -604,8 +604,8 @@ int __qcom_scm_restore_sec_cfg(struct device *dev, u32 device_id,
 	cfg.id = cpu_to_le32(device_id);
 	cfg.ctx_bank_num = cpu_to_le32(spare);
 
-	ret = qcom_scm_call(QCOM_SCM_MP_SVC, QCOM_SCM_RESTORE_SEC_CFG,
-			&cfg, sizeof(cfg), &scm_ret, sizeof(scm_ret));
+	ret = qcom_scm_call(dev, QCOM_SCM_SVC_MP, QCOM_SCM_RESTORE_SEC_CFG,
+			    &cfg, sizeof(cfg), &scm_ret, sizeof(scm_ret));
 
 	return ret ? : le32_to_cpu(scm_ret);
 }
@@ -638,4 +638,38 @@ int __qcom_scm_io_writel(struct device *dev, phys_addr_t addr, unsigned int val)
 {
 	return qcom_scm_call_atomic2(QCOM_SCM_SVC_IO, QCOM_SCM_IO_WRITE,
 				     addr, val);
+}
+
+int __qcom_scm_ocmem_lock(struct device *dev, u32 id, u32 offset, u32 size, u32 mode)
+{
+	struct ocmem_tz_lock {
+		__le32 id;
+		__le32 offset;
+		__le32 size;
+		__le32 mode;
+	} request;
+
+	request.id     = cpu_to_le32(id);
+	request.offset = cpu_to_le32(offset);
+	request.size   = cpu_to_le32(size);
+	request.mode   = cpu_to_le32(mode);
+
+	return qcom_scm_call(dev, QCOM_SCM_SVC_OCMEM, QCOM_SCM_OCMEM_LOCK_CMD,
+			&request, sizeof(request), NULL, 0);
+}
+
+int __qcom_scm_ocmem_unlock(struct device *dev, u32 id, u32 offset, u32 size)
+{
+	struct ocmem_tz_unlock {
+		__le32 id;
+		__le32 offset;
+		__le32 size;
+	} request;
+
+	request.id     = cpu_to_le32(id);
+	request.offset = cpu_to_le32(offset);
+	request.size   = cpu_to_le32(size);
+
+	return qcom_scm_call(dev, QCOM_SCM_SVC_OCMEM, QCOM_SCM_OCMEM_UNLOCK_CMD,
+			&request, sizeof(request), NULL, 0);
 }
