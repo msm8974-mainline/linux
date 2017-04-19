@@ -33,6 +33,8 @@ enum led_brightness {
 	LED_FULL	= 255,
 };
 
+struct led_pattern;
+
 struct led_classdev {
 	const char		*name;
 	enum led_brightness	 brightness;
@@ -87,6 +89,15 @@ struct led_classdev {
 	int		(*blink_set)(struct led_classdev *led_cdev,
 				     unsigned long *delay_on,
 				     unsigned long *delay_off);
+
+	int		(*pattern_set)(struct led_classdev *led_cdev,
+				       struct led_pattern *pattern, int len,
+				       bool repeat);
+
+	int		(*pattern_clear)(struct led_classdev *led_cdev);
+
+	struct led_pattern *(*pattern_get)(struct led_classdev *led_cdev,
+					   size_t *len, bool *repeat);
 
 	struct device		*dev;
 	const struct attribute_group	**groups;
@@ -445,5 +456,15 @@ extern void led_classdev_notify_brightness_hw_changed(
 static inline void led_classdev_notify_brightness_hw_changed(
 	struct led_classdev *led_cdev, enum led_brightness brightness) { }
 #endif
+
+/**
+ * struct led_pattern - brigheness value in a pattern
+ * @delta_t:	delay until next entry, in milliseconds
+ * @brightness:	brightness at time = 0
+ */
+struct led_pattern {
+	int delta_t;
+	int brightness;
+};
 
 #endif		/* __LINUX_LEDS_H_INCLUDED */
