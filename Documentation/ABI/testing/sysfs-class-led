@@ -61,3 +61,23 @@ Description:
 		gpio and backlight triggers. In case of the backlight trigger,
 		it is useful when driving a LED which is intended to indicate
 		a device in a standby like state.
+
+What:		/sys/class/leds/<led>/pattern
+Date:		July 2017
+KernelVersion:	4.14
+Description:
+		Specify a pattern for the LED, for LED hardware that support
+		altering the brightness as a function of time.
+
+		The pattern is given by a series of tuples, of brightness and
+		duration (ms). The LED is expected to traverse the series and
+		each brightness value for the specified duration.
+
+		Additionally a repeat marker ":|" can be appended to the
+		series, which should cause the pattern to be repeated
+		endlessly.
+
+		As LED hardware might have different capabilities and precision
+		the requested pattern might be slighly adjusted by the driver
+		and the resulting pattern of such operation should be returned
+		when this file is read.
