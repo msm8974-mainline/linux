@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: GPL-2.0
+ SPDX-License-Identifier: GPL-2.0
 snd-soc-88pm860x-objs := 88pm860x-codec.o
 snd-soc-ab8500-codec-objs := ab8500-codec.o
 snd-soc-ac97-objs := ac97.o
@@ -190,7 +190,7 @@ snd-soc-twl4030-objs := twl4030.o
 snd-soc-twl6040-objs := twl6040.o
 snd-soc-uda134x-objs := uda134x.o
 snd-soc-uda1380-objs := uda1380.o
-snd-soc-wcd9335-objs := wcd9335-slim.o wcd9335-regmap.o wcd-clsh.o
+snd-soc-wcd9335-objs := wcd9335-slim.o wcd9335-regmap.o wcd-clsh.o wcd9335.o
 snd-soc-wl1273-objs := wl1273.o
 snd-soc-wm-adsp-objs := wm_adsp.o
 snd-soc-wm0010-objs := wm0010.o
