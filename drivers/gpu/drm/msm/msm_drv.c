@@ -393,6 +393,14 @@ static int msm_drm_init(struct device *dev, struct drm_driver *drv)
 
 	drm_mode_config_init(ddev);
 
+	ret = msm_init_vram(ddev);
+	if (ret) {
+		msm_mdss_destroy(ddev);
+		kfree(priv);
+		drm_dev_unref(ddev);
+		return ret;
+	}
+
 	/* Bind all our sub-components: */
 	ret = component_bind_all(dev, ddev);
 	if (ret) {
@@ -401,10 +409,6 @@ static int msm_drm_init(struct device *dev, struct drm_driver *drv)
 		drm_dev_unref(ddev);
 		return ret;
 	}
-
-	ret = msm_init_vram(ddev);
-	if (ret)
-		goto fail;
 
 	msm_gem_shrinker_init(ddev);
 
