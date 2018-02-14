@@ -16,10 +16,7 @@
  * You should have received a copy of the GNU General Public License along with
  * this program.  If not, see <http://www.gnu.org/licenses/>.
  */
-
-#ifdef CONFIG_MSM_OCMEM
-#  include <mach/ocmem.h>
-#endif
+#include <soc/qcom/ocmem.h>
 
 #include "a3xx_gpu.h"
 
@@ -329,7 +326,7 @@ static void a3xx_destroy(struct msm_gpu *gpu)
 
 	adreno_gpu_cleanup(adreno_gpu);
 
-#ifdef CONFIG_MSM_OCMEM
+#ifdef CONFIG_QCOM_OCMEM
 	if (a3xx_gpu->ocmem_base)
 		ocmem_free(OCMEM_GRAPHICS, a3xx_gpu->ocmem_hdl);
 #endif
@@ -499,10 +496,16 @@ struct msm_gpu *a3xx_gpu_init(struct drm_device *dev)
 
 	/* if needed, allocate gmem: */
 	if (adreno_is_a330(adreno_gpu)) {
-#ifdef CONFIG_MSM_OCMEM
+#ifdef CONFIG_QCOM_OCMEM
 		/* TODO this is different/missing upstream: */
 		struct ocmem_buf *ocmem_hdl =
 				ocmem_allocate(OCMEM_GRAPHICS, adreno_gpu->gmem);
+
+		if (IS_ERR(ocmem_hdl)) {
+			dev_err(dev->dev, "failed to allocate ocmem\n");
+			ret = PTR_ERR(ocmem_hdl);
+			goto fail;
+		}
 
 		a3xx_gpu->ocmem_hdl = ocmem_hdl;
 		a3xx_gpu->ocmem_base = ocmem_hdl->addr;
