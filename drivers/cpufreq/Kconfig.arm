@@ -135,6 +135,16 @@ config ARM_QCOM_CPUFREQ_KRYO
 
 	  If in doubt, say N.
 
+config ARM_QCOM_CPUFREQ
+	bool "CPUfreq driver for the QCOM SoCs with KRAIT processors"
+	depends on ARCH_QCOM
+	select PM_OPP
+	help
+	  This enables the CPUFreq driver for Qualcomm SoCs with
+	  KRAIT processors.
+
+	  If in doubt, say N.
+
 config ARM_S3C_CPUFREQ
 	bool
 	help
