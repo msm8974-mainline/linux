@@ -460,10 +460,17 @@ static struct clk_rcg2 mdp_clk_src = {
 	},
 };
 
+static struct freq_tbl ftbl_gfx3d_clk_src[] = {
+	F(37500000, P_GPLL0, 16, 0, 0),
+	F(533000000, P_MMPLL0, 1.5, 0, 0),
+	{ }
+};
+
 static struct clk_rcg2 gfx3d_clk_src = {
 	.cmd_rcgr = 0x4000,
 	.hid_width = 5,
 	.parent_map = mmcc_xo_mmpll0_1_2_gpll0_map,
+	.freq_tbl = ftbl_gfx3d_clk_src,
 	.clkr.hw.init = &(struct clk_init_data){
 		.name = "gfx3d_clk_src",
 		.parent_names = mmcc_xo_mmpll0_1_2_gpll0,

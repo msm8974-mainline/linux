@@ -23,6 +23,7 @@
 #include <linux/of_device.h>
 #include <linux/platform_device.h>
 #include <linux/soc/qcom/smd-rpm.h>
+#include <linux/delay.h>
 
 #include <dt-bindings/clock/qcom,rpmcc.h>
 #include <dt-bindings/mfd/qcom-rpm.h>
@@ -769,6 +770,9 @@ static int rpm_smd_clk_probe(struct platform_device *pdev)
 
 	rcc->clks = rpm_smd_clks;
 	rcc->num_clks = num_clks;
+
+	/* delay rpm init, somehow this fixes some problems */
+	usleep_range(100000, 110000);
 
 	for (i = 0; i < num_clks; i++) {
 		if (!rpm_smd_clks[i])

@@ -455,6 +455,10 @@ static int dsi_bus_clk_enable(struct msm_dsi_host *msm_host)
 
 	DBG("id=%d", msm_host->id);
 
+	/* set the bus clock to the high value for now .. */
+	ret = clk_set_rate(msm_host->bus_clks[2], 466800000);
+	WARN_ON(ret);
+
 	for (i = 0; i < cfg->num_bus_clks; i++) {
 		ret = clk_prepare_enable(msm_host->bus_clks[i]);
 		if (ret) {
