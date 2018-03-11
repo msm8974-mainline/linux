@@ -963,6 +963,9 @@ static int q6v5_mpss_load(struct q6v5 *qproc)
 			max_addr = ALIGN(phdr->p_paddr + phdr->p_memsz, SZ_4K);
 	}
 
+	writel(qproc->mpss_phys, qproc->rmb_base + RMB_PMI_CODE_START_REG);
+	writel(RMB_CMD_LOAD_READY, qproc->rmb_base + RMB_MBA_COMMAND_REG);
+
 	mpss_reloc = relocate ? min_addr : qproc->mpss_phys;
 	qproc->mpss_reloc = mpss_reloc;
 	/* Load firmware segments */
@@ -1000,6 +1003,8 @@ static int q6v5_mpss_load(struct q6v5 *qproc)
 			       phdr->p_memsz - phdr->p_filesz);
 		}
 		size += phdr->p_memsz;
+
+		writel(size, qproc->rmb_base + RMB_PMI_CODE_LENGTH_REG);
 	}
 
 	/* Transfer ownership of modem ddr region to q6 */
@@ -1012,10 +1017,12 @@ static int q6v5_mpss_load(struct q6v5 *qproc)
 		goto release_firmware;
 	}
 
+#if 0
 	boot_addr = relocate ? qproc->mpss_phys : min_addr;
 	writel(boot_addr, qproc->rmb_base + RMB_PMI_CODE_START_REG);
 	writel(RMB_CMD_LOAD_READY, qproc->rmb_base + RMB_MBA_COMMAND_REG);
 	writel(size, qproc->rmb_base + RMB_PMI_CODE_LENGTH_REG);
+#endif
 
 	ret = q6v5_rmb_mba_wait(qproc, RMB_MBA_AUTH_COMPLETE, 10000);
 	if (ret == -ETIMEDOUT)
