@@ -18,6 +18,7 @@
 #include <linux/iio/iio.h>
 #include <linux/module.h>
 #include <linux/of_device.h>
+#include <linux/regulator/consumer.h>
 #include "inv_mpu_iio.h"
 
 static const struct regmap_config inv_mpu_regmap_config = {
@@ -47,6 +48,7 @@ static int inv_mpu6050_select_bypass(struct i2c_mux_core *muxc, u32 chan_id)
 				   INV_MPU6050_INT_PIN_CFG |
 				   INV_MPU6050_BIT_BYPASS_EN);
 	}
+
 write_error:
 	mutex_unlock(&st->lock);
 
@@ -99,6 +101,7 @@ static int inv_mpu_probe(struct i2c_client *client,
 	enum inv_devices chip_type;
 	struct regmap *regmap;
 	const char *name;
+	struct regulator *supply;
 
 	if (!i2c_check_functionality(client->adapter,
 				     I2C_FUNC_SMBUS_I2C_BLOCK))
@@ -126,6 +129,16 @@ static int inv_mpu_probe(struct i2c_client *client,
 			(int)PTR_ERR(regmap));
 		return PTR_ERR(regmap);
 	}
+
+	supply = devm_regulator_get(&client->dev, "vddio");
+	if (IS_ERR(supply)) {
+		if (PTR_ERR(supply) != -EPROBE_DEFER)
+			dev_err(&client->dev, "Failed to request regulator: %d", PTR_ERR(supply));
+		return PTR_ERR(supply);
+	}
+
+	regulator_enable(supply);
+	usleep_range(20000, 100000);
 
 	result = inv_mpu_core_probe(regmap, client->irq, name,
 				    NULL, chip_type);
@@ -177,6 +190,7 @@ static int inv_mpu_remove(struct i2c_client *client)
 static const struct i2c_device_id inv_mpu_id[] = {
 	{"mpu6050", INV_MPU6050},
 	{"mpu6500", INV_MPU6500},
+	{"mpu6515", INV_MPU6515},
 	{"mpu9150", INV_MPU9150},
 	{"mpu9250", INV_MPU9250},
 	{"icm20608", INV_ICM20608},
@@ -193,6 +207,10 @@ static const struct of_device_id inv_of_match[] = {
 	{
 		.compatible = "invensense,mpu6500",
 		.data = (void *)INV_MPU6500
+	},
+	{
+		.compatible = "invensense,mpu6515",
+		.data = (void *)INV_MPU6515
 	},
 	{
 		.compatible = "invensense,mpu9150",
