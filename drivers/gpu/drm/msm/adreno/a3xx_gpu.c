@@ -17,8 +17,10 @@
  * this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#define CONFIG_MSM_OCMEM
+
 #ifdef CONFIG_MSM_OCMEM
-#  include <mach/ocmem.h>
+#  include <linux/soc/qcom/ocmem.h>
 #endif
 
 #include "a3xx_gpu.h"
@@ -512,11 +514,13 @@ struct msm_gpu *a3xx_gpu_init(struct drm_device *dev)
 		struct ocmem_buf *ocmem_hdl =
 				ocmem_allocate(OCMEM_GRAPHICS, adreno_gpu->gmem);
 
-		a3xx_gpu->ocmem_hdl = ocmem_hdl;
-		a3xx_gpu->ocmem_base = ocmem_hdl->addr;
-		adreno_gpu->gmem = ocmem_hdl->len;
-		DBG("using %dK of OCMEM at 0x%08x", adreno_gpu->gmem / 1024,
-				a3xx_gpu->ocmem_base);
+        if (!IS_ERR(ocmem_hdl)) {
+            a3xx_gpu->ocmem_hdl = ocmem_hdl;
+            a3xx_gpu->ocmem_base = ocmem_hdl->addr;
+            adreno_gpu->gmem = ocmem_hdl->len;
+            DBG("using %dK of OCMEM at 0x%08x", adreno_gpu->gmem / 1024,
+                    a3xx_gpu->ocmem_base);
+        }
 #endif
 	}
 
@@ -529,8 +533,8 @@ struct msm_gpu *a3xx_gpu_init(struct drm_device *dev)
 		 * implement a cmdstream validator.
 		 */
 		DRM_DEV_ERROR(dev->dev, "No memory protection without IOMMU\n");
-		ret = -ENXIO;
-		goto fail;
+		/* ret = -ENXIO;
+		goto fail; */
 	}
 
 	return gpu;
