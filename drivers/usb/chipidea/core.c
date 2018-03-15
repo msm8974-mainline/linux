@@ -704,25 +704,9 @@ static int ci_get_platdata(struct device *dev,
 	cable->nb.notifier_call = ci_cable_notifier;
 	cable->edev = ext_vbus;
 
-	if (!IS_ERR(ext_vbus)) {
-		ret = extcon_get_state(cable->edev, EXTCON_USB);
-		if (ret)
-			cable->connected = true;
-		else
-			cable->connected = false;
-	}
-
 	cable = &platdata->id_extcon;
 	cable->nb.notifier_call = ci_cable_notifier;
 	cable->edev = ext_id;
-
-	if (!IS_ERR(ext_id)) {
-		ret = extcon_get_state(cable->edev, EXTCON_USB_HOST);
-		if (ret)
-			cable->connected = true;
-		else
-			cable->connected = false;
-	}
 	return 0;
 }
 
@@ -892,6 +876,7 @@ static int ci_hdrc_probe(struct platform_device *pdev)
 {
 	struct device	*dev = &pdev->dev;
 	struct ci_hdrc	*ci;
+	struct ci_hdrc_cable *cable;
 	struct resource	*res;
 	void __iomem	*base;
 	int		ret;
@@ -1007,6 +992,24 @@ static int ci_hdrc_probe(struct platform_device *pdev)
 			dev_err(dev, "init otg fails, ret = %d\n", ret);
 			goto deinit_gadget;
 		}
+	}
+
+	cable = &ci->platdata->vbus_extcon;
+	if (!IS_ERR(cable->edev)) {
+		ret = extcon_get_state(cable->edev, EXTCON_USB);
+		if (ret)
+			cable->connected = true;
+		else
+			cable->connected = false;
+	}
+
+	cable = &ci->platdata->id_extcon;
+	if (!IS_ERR(cable->edev)) {
+		ret = extcon_get_state(cable->edev, EXTCON_USB_HOST);
+		if (ret)
+			cable->connected = true;
+		else
+			cable->connected = false;
 	}
 
 	if (ci->roles[CI_ROLE_HOST] && ci->roles[CI_ROLE_GADGET]) {
