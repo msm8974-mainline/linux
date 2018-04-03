@@ -3504,6 +3504,7 @@ void __drm_atomic_helper_plane_duplicate_state(struct drm_plane *plane,
 	if (state->fb)
 		drm_framebuffer_get(state->fb);
 
+	state->dirty = false;
 	state->fence = NULL;
 	state->commit = NULL;
 }
@@ -3846,6 +3847,71 @@ fail:
 	return ret;
 }
 EXPORT_SYMBOL(drm_atomic_helper_legacy_gamma_set);
+
+/**
+ * drm_atomic_helper_dirtyfb - helper for dirtyfb
+ *
+ * A helper to implement drm_framebuffer_funcs::dirty
+ */
+int drm_atomic_helper_dirtyfb(struct drm_framebuffer *fb,
+			      struct drm_file *file_priv, unsigned flags,
+			      unsigned color, struct drm_clip_rect *clips,
+			      unsigned num_clips)
+{
+	struct drm_modeset_acquire_ctx ctx;
+	struct drm_atomic_state *state;
+	struct drm_plane *plane;
+	int ret = 0;
+
+	/*
+	 * When called from ioctl, we are interruptable, but not when
+	 * called internally (ie. defio worker)
+	 */
+	drm_modeset_acquire_init(&ctx,
+		file_priv ? DRM_MODESET_ACQUIRE_INTERRUPTIBLE : 0);
+
+	state = drm_atomic_state_alloc(fb->dev);
+	if (!state) {
+		ret = -ENOMEM;
+		goto out;
+	}
+	state->acquire_ctx = &ctx;
+
+retry:
+	drm_for_each_plane(plane, fb->dev) {
+		struct drm_plane_state *plane_state;
+
+		if (plane->state->fb != fb)
+			continue;
+
+		plane_state = drm_atomic_get_plane_state(state, plane);
+		if (IS_ERR(plane_state)) {
+			ret = PTR_ERR(plane_state);
+			goto out;
+		}
+
+		plane_state->dirty = true;
+	}
+
+	ret = drm_atomic_nonblocking_commit(state);
+
+out:
+	if (ret == -EDEADLK) {
+		drm_atomic_state_clear(state);
+		ret = drm_modeset_backoff(&ctx);
+		if (!ret)
+			goto retry;
+	}
+
+	drm_atomic_state_put(state);
+
+	drm_modeset_drop_locks(&ctx);
+	drm_modeset_acquire_fini(&ctx);
+
+	return ret;
+
+}
+EXPORT_SYMBOL(drm_atomic_helper_dirtyfb);
 
 /**
  * __drm_atomic_helper_private_duplicate_state - copy atomic private state

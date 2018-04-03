@@ -201,7 +201,10 @@ int msm_atomic_commit(struct drm_device *dev,
 	 * Figure out what fence to wait for:
 	 */
 	for_each_oldnew_plane_in_state(state, plane, old_plane_state, new_plane_state, i) {
-		if ((new_plane_state->fb != old_plane_state->fb) && new_plane_state->fb) {
+		bool sync_fb = new_plane_state->fb &&
+			((new_plane_state->fb != old_plane_state->fb) ||
+			 new_plane_state->dirty);
+		if (sync_fb) {
 			struct drm_gem_object *obj = msm_framebuffer_bo(new_plane_state->fb, 0);
 			struct msm_gem_object *msm_obj = to_msm_bo(obj);
 			struct dma_fence *fence = reservation_object_get_excl_rcu(msm_obj->resv);

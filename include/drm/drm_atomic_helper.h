@@ -183,6 +183,10 @@ int drm_atomic_helper_legacy_gamma_set(struct drm_crtc *crtc,
 				       u16 *red, u16 *green, u16 *blue,
 				       uint32_t size,
 				       struct drm_modeset_acquire_ctx *ctx);
+int drm_atomic_helper_dirtyfb(struct drm_framebuffer *fb,
+			      struct drm_file *file_priv, unsigned flags,
+			      unsigned color, struct drm_clip_rect *clips,
+			      unsigned num_clips);
 void __drm_atomic_helper_private_obj_duplicate_state(struct drm_private_obj *obj,
 						     struct drm_private_state *state);
 
