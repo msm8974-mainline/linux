@@ -77,6 +77,15 @@ struct drm_plane_state {
 	struct drm_framebuffer *fb;
 
 	/**
+	 * @dirty:
+	 *
+	 * Flag that indicates the fb contents have changed even though the
+	 * fb has not.  This is mostly a stop-gap solution until we have
+	 * atomic dirty-rect(s) property.
+	 */
+	bool dirty;
+
+	/**
 	 * @fence:
 	 *
 	 * Optional fence to wait for before scanning out @fb. Do not write this

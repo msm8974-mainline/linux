@@ -62,6 +62,7 @@ static void msm_framebuffer_destroy(struct drm_framebuffer *fb)
 static const struct drm_framebuffer_funcs msm_framebuffer_funcs = {
 	.create_handle = msm_framebuffer_create_handle,
 	.destroy = msm_framebuffer_destroy,
+	.dirty = drm_atomic_helper_dirtyfb,
 };
 
 #ifdef CONFIG_DEBUG_FS
