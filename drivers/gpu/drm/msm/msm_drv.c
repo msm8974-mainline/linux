@@ -393,6 +393,8 @@ static int msm_drm_init(struct device *dev, struct drm_driver *drv)
 
 	drm_mode_config_init(ddev);
 
+	usleep_range(5000000, 10000000);
+
 	ret = msm_init_vram(ddev);
 	if (ret) {
 		msm_mdss_destroy(ddev);
