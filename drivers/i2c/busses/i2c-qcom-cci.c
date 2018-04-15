@@ -72,7 +72,7 @@
 #define CCI_IRQ_STATUS_0_I2C_M1_ERROR		0x60ee6000
 
 #define CCI_TIMEOUT_MS 100
-#define NUM_MASTERS 1
+#define NUM_MASTERS 2
 #define NUM_QUEUES 2
 
 #define CCI_RES_MAX 6

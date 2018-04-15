@@ -6,6 +6,7 @@
 #include <dt-bindings/clock/qcom,rpmcc.h>
 #include <dt-bindings/reset/qcom,gcc-msm8974.h>
 #include <dt-bindings/gpio/gpio.h>
+#include <dt-bindings/soc/qcom,apr.h>
 #include "skeleton.dtsi"
 
 / {
@@ -18,27 +19,27 @@
 		#size-cells = <1>;
 		ranges;
 
-		mpss@8000000 {
-			reg = <0x08000000 0x5100000>;
+		mpss_region: mpss@8000000 {
+			reg = <0x08000000 0x5800000>;
 			no-map;
 		};
 
-		mba@d100000 {
-			reg = <0x0d100000 0x100000>;
+		mba_region: mba@d800000 {
+			reg = <0x0d800000 0x100000>;
 			no-map;
 		};
 
-		reserved@d200000 {
-			reg = <0x0d200000 0xa00000>;
+		reserved@d900000 {
+			reg = <0x0d900000 0x300000>;
 			no-map;
 		};
 
 		adsp_region: adsp@dc00000 {
-			reg = <0x0dc00000 0x1900000>;
+			reg = <0x0dc00000 0x1900000>; // firmware has size 0x1400000
 			no-map;
 		};
 
-		venus@f500000 {
+		venus_mem: venus@f500000 {
 			reg = <0x0f500000 0x500000>;
 			no-map;
 		};
@@ -59,8 +60,10 @@
 		};
 
 		rmtfs@fd80000 {
+			compatible = "qcom,rmtfs-mem";
 			reg = <0x0fd80000 0x180000>;
 			no-map;
+			qcom,client-id = <1>;
 		};
 	};
 
@@ -259,6 +262,51 @@
 
 		qcom,smem-states = <&adsp_smp2p_out 0>;
 		qcom,smem-state-names = "stop";
+	};
+
+	modem-rproc@fc880000 {
+		compatible = "qcom,msm8974-mss-pil";
+		reg = <0xfc880000 0x100>,
+		      <0xfc820000 0x020>;
+		reg-names = "qdsp6", "rmb";
+
+		interrupts-extended = <&intc 0 24 1>,
+				      <&modem_smp2p_in 0 0>,
+				      <&modem_smp2p_in 1 0>,
+				      <&modem_smp2p_in 2 0>,
+				      <&modem_smp2p_in 3 0>;
+		interrupt-names = "wdog",
+				  "fatal",
+				  "ready",
+				  "handover",
+				  "stop-ack";
+
+		clocks = <&gcc GCC_MSS_Q6_BIMC_AXI_CLK>,
+			 <&gcc GCC_MSS_CFG_AHB_CLK>,
+			 <&gcc GCC_BOOT_ROM_AHB_CLK>,
+			 <&xo_board>;
+		clock-names = "iface", "bus", "mem", "xo";
+
+		qcom,halt-regs = <&tcsr_mutex_block 0x1180 0x1200 0x1280>;
+
+		resets = <&gcc GCC_MSS_RESTART>;
+		reset-names = "mss_restart";
+
+		cx-supply = <&pm8841_s2>;
+		mss-supply = <&pm8841_s3>;
+		mx-supply = <&pm8841_s1>;
+		pll-supply = <&pm8941_l12>;
+
+		qcom,smem-states = <&modem_smp2p_out 0>;
+		qcom,smem-state-names = "stop";
+
+		mba {
+			memory-region = <&mba_region>;
+		};
+
+		mpss {
+			memory-region = <&mpss_region>;
+		};
 	};
 
 	smem {
@@ -542,7 +590,7 @@
 
 		restart@fc4ab000 {
 			compatible = "qcom,pshold";
-			reg = <0xfc4ab000 0x4>;
+			reg = <0xfc4ab000 0x4>, <0xfe80565c 0x4>;
 		};
 
 		gcc: clock-controller@fc400000 {
@@ -597,6 +645,15 @@
 			reg = <0xf991e000 0x1000>;
 			interrupts = <0 108 0x0>;
 			clocks = <&gcc GCC_BLSP1_UART2_APPS_CLK>, <&gcc GCC_BLSP1_AHB_CLK>;
+			clock-names = "core", "iface";
+			status = "disabled";
+		};
+
+		blsp2_uart10: serial@f9960000 {
+			compatible = "qcom,msm-uartdm-v1.4", "qcom,msm-uartdm";
+			reg = <0xf9960000 0x1000>;
+			interrupts = <0 116 0x0>;
+			clocks = <&gcc GCC_BLSP2_UART4_APPS_CLK>, <&gcc GCC_BLSP2_AHB_CLK>;
 			clock-names = "core", "iface";
 			status = "disabled";
 		};
@@ -702,12 +759,34 @@
 			interrupts = <0 208 0>;
 		};
 
+		i2c@f9923000 {
+			status = "disabled";
+			compatible = "qcom,i2c-qup-v2.1.1";
+			reg = <0xf9923000 0x1000>;
+			interrupts = <0 95 IRQ_TYPE_NONE>;
+			clocks = <&gcc GCC_BLSP1_QUP1_I2C_APPS_CLK>, <&gcc GCC_BLSP1_AHB_CLK>;
+			clock-names = "core", "iface";
+			#address-cells = <1>;
+			#size-cells = <0>;
+		};
+
 		i2c@f9924000 {
 			status = "disabled";
 			compatible = "qcom,i2c-qup-v2.1.1";
 			reg = <0xf9924000 0x1000>;
 			interrupts = <0 96 IRQ_TYPE_NONE>;
 			clocks = <&gcc GCC_BLSP1_QUP2_I2C_APPS_CLK>, <&gcc GCC_BLSP1_AHB_CLK>;
+			clock-names = "core", "iface";
+			#address-cells = <1>;
+			#size-cells = <0>;
+		};
+
+		blsp_i2c3: i2c@f9925000 {
+			status = "disabled";
+			compatible = "qcom,i2c-qup-v2.1.1";
+			reg = <0xf9925000 0x1000>;
+			interrupts = <0 97 IRQ_TYPE_NONE>;
+			clocks = <&gcc GCC_BLSP1_QUP3_I2C_APPS_CLK>, <&gcc GCC_BLSP1_AHB_CLK>;
 			clock-names = "core", "iface";
 			#address-cells = <1>;
 			#size-cells = <0>;
@@ -735,6 +814,17 @@
 			#size-cells = <0>;
 			dmas = <&blsp2_dma 20>, <&blsp2_dma 21>;
 			dma-names = "tx", "rx";
+		};
+
+		blsp_i2c12: i2c@f9968000 {
+			status = "disabled";
+			compatible = "qcom,i2c-qup-v2.1.1";
+			reg = <0xf9968000 0x1000>;
+			interrupts = <0 106 IRQ_TYPE_NONE>;
+			clocks = <&gcc GCC_BLSP2_QUP6_I2C_APPS_CLK>, <&gcc GCC_BLSP2_AHB_CLK>;
+			clock-names = "core", "iface";
+			#address-cells = <1>;
+			#size-cells = <0>;
 		};
 
 		spmi_bus: spmi@fc4cf000 {
@@ -1044,6 +1134,42 @@
 
 			qcom,ipc = <&apcs 8 8>;
 			qcom,smd-edge = <1>;
+
+			apr {
+				compatible = "qcom,apr-v2";
+				qcom,smd-channels = "apr_audio_svc";
+				qcom,apr-dest-domain-id = <APR_DOMAIN_ADSP>;
+
+				q6core {
+					qcom,apr-svc-name = "CORE";
+					qcom,apr-svc-id = <APR_SVC_ADSP_CORE>;
+					compatible = "qcom,q6core";
+				};
+
+				q6afe: q6afe {
+					compatible = "qcom,q6afe";
+					qcom,apr-svc-name = "AFE";
+					qcom,apr-svc-id = <APR_SVC_AFE>;
+					#sound-dai-cells = <1>;
+				};
+
+				q6asm: q6asm {
+					compatible = "qcom,q6asm";
+					qcom,apr-svc-name = "ASM";
+					qcom,apr-svc-id = <APR_SVC_ASM>;
+					#sound-dai-cells = <1>;
+				};
+
+				q6adm: q6adm {
+					compatible = "qcom,q6adm";
+					qcom,apr-svc-name = "ADM";
+					qcom,apr-svc-id = <APR_SVC_ADM>;
+					#sound-dai-cells = <0>;
+				};
+
+				sound_card: audio {
+				};
+			};
 		};
 
 		modem {

@@ -168,6 +168,15 @@
 			reg = <0x2800>;
 			status = "disabled";
 		};
+
+		pm8941_clk_divs: clock-controller@5b00 {
+			compatible = "qcom,spmi-clkdiv";
+			reg = <0x5b00>;
+			#clock-cells = <1>;
+			qcom,num-clkdivs = <3>;
+			clocks = <&xo_board>;
+			clock-names = "xo";
+		};
 	};
 
 	pm8941_1: pm8941@1 {
