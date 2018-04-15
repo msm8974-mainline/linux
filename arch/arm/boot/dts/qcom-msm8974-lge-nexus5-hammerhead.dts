@@ -6,8 +6,8 @@
 #include <dt-bindings/input/input.h>
 #include <dt-bindings/pinctrl/qcom,pmic-gpio.h>
 #include <dt-bindings/clock/qcom,mmcc-msm8974.h>
-#include <dt-bindings/sound/qcom,q6afe.h>
-#include <dt-bindings/sound/qcom,q6asm.h>
+//#include <dt-bindings/sound/qcom,q6afe.h>
+//#include <dt-bindings/sound/qcom,q6asm.h>
 
 / {
 	model = "LGE MSM 8974 HAMMERHEAD";
@@ -1437,6 +1437,7 @@
 	};
 };
 
+/*
 &sound_card {
 	compatible	= "qcom,apq8096-sndcard";
 	qcom,model = "DB820c";
@@ -1467,3 +1468,4 @@
 		};
 	};
 };
+*/

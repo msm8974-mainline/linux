@@ -6,7 +6,7 @@
 #include <dt-bindings/clock/qcom,rpmcc.h>
 #include <dt-bindings/reset/qcom,gcc-msm8974.h>
 #include <dt-bindings/gpio/gpio.h>
-#include <dt-bindings/soc/qcom,apr.h>
+//#include <dt-bindings/soc/qcom,apr.h>
 #include "skeleton.dtsi"
 
 / {
@@ -1135,6 +1135,7 @@
 			qcom,ipc = <&apcs 8 8>;
 			qcom,smd-edge = <1>;
 
+			/*
 			apr {
 				compatible = "qcom,apr-v2";
 				qcom,smd-channels = "apr_audio_svc";
@@ -1170,6 +1171,7 @@
 				sound_card: audio {
 				};
 			};
+			*/
 		};
 
 		modem {
