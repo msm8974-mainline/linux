@@ -5227,6 +5227,32 @@ static const struct panel_desc_dsi osd101t2045_53ts = {
 	.lanes = 4,
 };
 
+static const struct drm_display_mode sharp_ls052t3sx02_mode = {
+	.clock = 149074,
+	.hdisplay = 1080,
+	.hsync_start = 1080 + 4,
+	.hsync_end = 1080 + 4 + 128,
+	.htotal = 1080 + 4 + 128 + 76,
+	.vdisplay = 1920,
+	.vsync_start = 1920 + 2,
+	.vsync_end = 1920 + 2 + 4,
+	.vtotal = 1920 + 2 + 4 + 3,
+};
+
+static const struct panel_desc_dsi sharp_ls052t3sx02 = {
+	.desc = {
+		.modes = &sharp_ls052t3sx02_mode,
+		.num_modes = 1,
+		.size = {
+			.width = 62,
+			.height = 110,
+		},
+	},
+	.flags = MIPI_DSI_MODE_VIDEO | MIPI_DSI_MODE_VIDEO_HSE,
+	.format = MIPI_DSI_FMT_RGB888,
+	.lanes = 4,
+};
+
 static const struct of_device_id dsi_of_match[] = {
 	{
 		.compatible = "auo,b080uan01",
@@ -5249,6 +5275,9 @@ static const struct of_device_id dsi_of_match[] = {
 	}, {
 		.compatible = "osddisplays,osd101t2045-53ts",
 		.data = &osd101t2045_53ts
+	}, {
+		.compatible = "sharp,ls052t3sx02",
+		.data = &sharp_ls052t3sx02
 	}, {
 		/* sentinel */
 	}
