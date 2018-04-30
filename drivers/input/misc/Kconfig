@@ -280,6 +280,12 @@ config INPUT_GPIO_DECODER
 	 To compile this driver as a module, choose M here: the module
 	 will be called gpio_decoder.
 
+config INPUT_QCOM_VIBRATOR
+	tristate "Qualcomm PWM vibrator support"
+	select INPUT_FF_MEMLESS
+	help
+	  vibrator controlled by mmcc clock PWN
+
 config INPUT_IXP4XX_BEEPER
 	tristate "IXP4XX Beeper support"
 	depends on ARCH_IXP4XX
