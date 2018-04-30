@@ -470,11 +470,18 @@ static const struct i2c_device_id lm3630a_id[] = {
 	{}
 };
 
+static struct of_device_id lm3630_match_table[] = {
+	{ .compatible = "ti,lm3630",},
+	{ },
+};
+
+
 MODULE_DEVICE_TABLE(i2c, lm3630a_id);
 
 static struct i2c_driver lm3630a_i2c_driver = {
 	.driver = {
 		   .name = LM3630A_NAME,
+		   .of_match_table = lm3630_match_table,
 		   },
 	.probe = lm3630a_probe,
 	.remove = lm3630a_remove,
