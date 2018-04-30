@@ -769,7 +769,7 @@
 
             panel: panel@0 {
                 reg = <0>;
-                compatible = "jdi,1080p";
+                compatible = "jdi,1080p-hammerhead";
 
                 // backlight?, reset?, enable?
 
