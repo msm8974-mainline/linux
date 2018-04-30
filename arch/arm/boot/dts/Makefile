@@ -1005,6 +1005,7 @@ dtb-$(CONFIG_ARCH_QCOM) += \
 	qcom-msm8974-samsung-klte.dtb \
 	qcom-msm8974-sony-xperia-amami.dtb \
 	qcom-msm8974-sony-xperia-castor.dtb \
+	qcom-msm8974-sony-xperia-sirius.dtb \
 	qcom-msm8974-sony-xperia-honami.dtb \
 	qcom-mdm9615-wp8548-mangoh-green.dtb \
 	qcom-sdx55-mtp.dtb \
