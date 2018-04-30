@@ -266,7 +266,7 @@ static int spmi_pmic_clkdiv_probe(struct platform_device *pdev)
 	init.ops = &clk_spmi_pmic_div_ops;
 
 	for (i = 0, clkdiv = cc->clks; i < nclks; i++) {
-		snprintf(name, sizeof(name), "div_clk%d", i + 1);
+		snprintf(name, sizeof(name), "div_clk_spmi_%d", i + 1);
 
 		spin_lock_init(&clkdiv[i].lock);
 		clkdiv[i].base = start + i * 0x100;
