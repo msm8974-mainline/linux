@@ -341,7 +341,7 @@ static int venus_alloc(struct venus_hfi_device *hdev, struct mem_desc *desc,
 {
 	struct device *dev = hdev->core->dev;
 
-	desc->attrs = DMA_ATTR_WRITE_COMBINE;
+	desc->attrs = DMA_ATTR_WRITE_COMBINE | DMA_ATTR_FORCE_CONTIGUOUS;
 	desc->size = ALIGN(size, SZ_4K);
 
 	desc->kva = dma_alloc_attrs(dev, desc->size, &desc->da, GFP_KERNEL,
@@ -557,9 +557,9 @@ static int venus_power_off(struct venus_hfi_device *hdev)
 	if (!hdev->power_enabled)
 		return 0;
 
-	ret = qcom_scm_set_remote_state(TZBSP_VIDEO_STATE_SUSPEND, 0);
-	if (ret)
-		return ret;
+	//ret = qcom_scm_set_remote_state(TZBSP_VIDEO_STATE_SUSPEND, 0);
+	//if (ret)
+//		return ret;
 
 	ret = venus_halt_axi(hdev);
 	if (ret)
@@ -577,9 +577,9 @@ static int venus_power_on(struct venus_hfi_device *hdev)
 	if (hdev->power_enabled)
 		return 0;
 
-	ret = qcom_scm_set_remote_state(TZBSP_VIDEO_STATE_RESUME, 0);
-	if (ret)
-		goto err;
+	//ret = qcom_scm_set_remote_state(TZBSP_VIDEO_STATE_RESUME, 0);
+	//if (ret)
+	//	goto err;
 
 	ret = venus_run(hdev);
 	if (ret)
@@ -590,7 +590,7 @@ static int venus_power_on(struct venus_hfi_device *hdev)
 	return 0;
 
 err_suspend:
-	qcom_scm_set_remote_state(TZBSP_VIDEO_STATE_SUSPEND, 0);
+	//qcom_scm_set_remote_state(TZBSP_VIDEO_STATE_SUSPEND, 0);
 err:
 	hdev->power_enabled = false;
 	return ret;
