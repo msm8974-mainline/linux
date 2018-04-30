@@ -18,6 +18,7 @@
 #include <linux/iio/iio.h>
 #include <linux/module.h>
 #include <linux/of_device.h>
+#include <linux/regulator/consumer.h>
 #include "inv_mpu_iio.h"
 
 static const struct regmap_config inv_mpu_regmap_config = {
@@ -90,6 +91,7 @@ static int inv_mpu_probe(struct i2c_client *client,
 	int result;
 	enum inv_devices chip_type;
 	struct regmap *regmap;
+	struct regulator *supply;
 	const char *name;
 
 	if (!i2c_check_functionality(client->adapter,
@@ -117,6 +119,23 @@ static int inv_mpu_probe(struct i2c_client *client,
 		dev_err(&client->dev, "Failed to register i2c regmap %d\n",
 			(int)PTR_ERR(regmap));
 		return PTR_ERR(regmap);
+	}
+
+	supply = devm_regulator_get(&client->dev, "vddio");
+	if (IS_ERR(supply)) {
+		if (PTR_ERR(supply) == -EPROBE_DEFER)
+			return PTR_ERR(supply);
+
+		/* Supply isn't always necessary */
+		supply = NULL;
+	}
+
+	if (supply) {
+		result = regulator_enable(supply);
+		if (result)
+			return result;
+
+		usleep_range(20000, 100000);
 	}
 
 	result = inv_mpu_core_probe(regmap, client->irq, name,
@@ -174,6 +193,7 @@ static int inv_mpu_remove(struct i2c_client *client)
 static const struct i2c_device_id inv_mpu_id[] = {
 	{"mpu6050", INV_MPU6050},
 	{"mpu6500", INV_MPU6500},
+	{"mpu6515", INV_MPU6515},
 	{"mpu9150", INV_MPU9150},
 	{"mpu9250", INV_MPU9250},
 	{"mpu9255", INV_MPU9255},
@@ -191,6 +211,10 @@ static const struct of_device_id inv_of_match[] = {
 	{
 		.compatible = "invensense,mpu6500",
 		.data = (void *)INV_MPU6500
+	},
+	{
+		.compatible = "invensense,mpu6515",
+		.data = (void *)INV_MPU6515
 	},
 	{
 		.compatible = "invensense,mpu9150",
