@@ -1,0 +1,12 @@
+--- drivers/gpu/drm/panel/panel-simple.c
++++ drivers/gpu/drm/panel/panel-simple.c
+@@ -2548,6 +2575,9 @@ static const struct of_device_id dsi_of_match[] = {
+ 	}, {
+ 		.compatible = "jdi,1080p",
+ 		.data = &jdi_1080p
++	}, {
++		.compatible = "sharp,ls052t3sx02",
++		.data = &sharp_ls052t3sx02
+ 	},{
+ 		/* sentinel */
+ 	}
