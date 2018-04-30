@@ -31,8 +31,8 @@
 #include "camss-ispif.h"
 #include "camss-vfe.h"
 
-#define CAMSS_CSID_NUM 2
-#define CAMSS_CSIPHY_NUM 2
+#define CAMSS_CSID_NUM 4
+#define CAMSS_CSIPHY_NUM 3
 
 #define to_camss(ptr_module)	\
 	container_of(ptr_module, struct camss, ptr_module)
@@ -50,24 +50,31 @@
 #define to_device_index(ptr_module, index)	\
 	(to_camss_index(ptr_module, index)->dev)
 
-#define CAMSS_RES_MAX 15
-
 struct resources {
-	char *regulator[CAMSS_RES_MAX];
-	char *clock[CAMSS_RES_MAX];
-	u32 clock_rate[CAMSS_RES_MAX][CAMSS_RES_MAX];
-	char *reg[CAMSS_RES_MAX];
-	char *interrupt[CAMSS_RES_MAX];
+	const char *const *regulator;
+	const char *const *clock;
+	const u32 *const *clock_rate;
+	const char *const *reg;
+	const char *const *interrupt;
 };
 
 struct resources_ispif {
-	char *clock[CAMSS_RES_MAX];
-	char *clock_for_reset[CAMSS_RES_MAX];
-	char *reg[CAMSS_RES_MAX];
-	char *interrupt;
+	const char *const *clock;
+	const char *const *clock_for_reset;
+	const char *const *reg;
+	const char *interrupt;
+};
+
+struct camss_resources {
+	const struct resources *csiphy_res;
+	const struct resources *csid_res;
+	const struct resources_ispif *ispif_res;
+	const struct resources *vfe_res;
+	u8 csiphy_num, csid_num, vfe_num;
 };
 
 struct camss {
+	const struct camss_resources *res;
 	struct v4l2_device v4l2_dev;
 	struct v4l2_async_notifier notifier;
 	struct media_device media_dev;
