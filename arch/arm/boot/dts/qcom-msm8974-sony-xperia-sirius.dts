@@ -215,6 +215,8 @@
 						regulator-max-microvolt = <2950000>;
 
 						regulator-boot-on;
+						regulator-allow-set-load;
+						regulator-system-load = <200000>;
 					};
 
 					l22 {
