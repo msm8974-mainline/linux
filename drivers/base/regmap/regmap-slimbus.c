@@ -31,9 +31,32 @@ static int regmap_slimbus_byte_reg_write(void *context, unsigned int reg,
 	return slim_writeb(sdev, reg, val);
 }
 
+#define REG_BYTES 2
+
+static int regmap_slimbus_write(void *context, const void *data, size_t count)
+{
+	struct slim_device *sdev = context;
+	unsigned short reg;
+
+	reg = *(u16 *)data + 0x800;
+
+	return slim_write(sdev, reg, count - REG_BYTES, data + REG_BYTES);
+}
+
+static int regmap_slimbus_read(void *context, const void *reg, size_t reg_size,
+			       void *val, size_t val_size)
+{
+	struct slim_device *sdev = context;
+
+	return slim_read(sdev, *(u16 *)reg + 0x800, val_size, val);
+
+}
+
 static struct regmap_bus regmap_slimbus_bus = {
-	.reg_write = regmap_slimbus_byte_reg_write,
-	.reg_read = regmap_slimbus_byte_reg_read,
+	//.reg_write = regmap_slimbus_byte_reg_write,
+	//.reg_read = regmap_slimbus_byte_reg_read,
+	.write = regmap_slimbus_write,
+	.read = regmap_slimbus_read,
 	.reg_format_endian_default = REGMAP_ENDIAN_LITTLE,
 	.val_format_endian_default = REGMAP_ENDIAN_LITTLE,
 };
