@@ -252,6 +252,7 @@ int slim_do_transfer(struct slim_controller *ctrl, struct slim_msg_txn *txn);
 int slim_ctrl_clk_pause(struct slim_controller *ctrl, bool wakeup, u8 restart);
 int slim_prepare_txn(struct slim_controller *ctrl, struct slim_msg_txn *txn,
 		     struct completion *done, bool need_tid);
+int slim_alloc_tid(struct slim_controller *ctrl, struct slim_msg_txn *txn);
 
 static inline bool slim_tid_txn(u8 mt, u8 mc)
 {

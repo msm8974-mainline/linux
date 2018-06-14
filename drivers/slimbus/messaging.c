@@ -56,6 +56,33 @@ void slim_msg_response(struct slim_controller *ctrl, u8 *reply, u8 tid, u8 len)
 EXPORT_SYMBOL_GPL(slim_msg_response);
 
 /**
+ * slim_alloc_tid() - Allocate a tid to txn
+ *
+ * @ctrl: Controller handle
+ * @txn: transaction to be allocated with tid.
+ *
+ * Called by controller to assign a tid totransaction
+ *
+ * Return: zero on success with valid txn->tid and error code on failures.
+ */
+int slim_alloc_tid(struct slim_controller *ctrl, struct slim_msg_txn *txn)
+{
+	unsigned long flags;
+	int ret = 0;
+
+	spin_lock_irqsave(&ctrl->txn_lock, flags);
+	ret = idr_alloc_cyclic(&ctrl->tid_idr, txn, 0, SLIM_MAX_TIDS, GFP_ATOMIC);
+	if (ret < 0) {
+		spin_unlock_irqrestore(&ctrl->txn_lock, flags);
+		return ret;
+	}
+	txn->tid = ret;
+	spin_unlock_irqrestore(&ctrl->txn_lock, flags);
+	return 0;
+}
+EXPORT_SYMBOL_GPL(slim_alloc_tid);
+
+/**
  * slim_prepare_txn() - Prepare a transaction
  *
  * @ctrl: Controller handle
@@ -71,30 +98,25 @@ EXPORT_SYMBOL_GPL(slim_msg_response);
 int slim_prepare_txn(struct slim_controller *ctrl, struct slim_msg_txn *txn,
 		     struct completion *done, bool need_tid)
 {
-	unsigned long flags;
-	int ret = 0;
+	int ret;
 
 	txn->need_tid = need_tid;
 	if (!need_tid)
 		return 0;
 
-	spin_lock_irqsave(&ctrl->txn_lock, flags);
-	ret = idr_alloc_cyclic(&ctrl->tid_idr, txn, 0, SLIM_MAX_TIDS, GFP_ATOMIC);
+	ret = slim_alloc_tid(ctrl, txn);
 	if (ret < 0)
-		goto err;
+		return ret;
 
-	txn->tid = ret;
-	ret = 0;
 	if (!txn->msg->comp)
 		txn->comp = done;
 	else
 		txn->comp = txn->msg->comp;
 
-err:
-	spin_unlock_irqrestore(&ctrl->txn_lock, flags);
 	return ret;
 }
 EXPORT_SYMBOL_GPL(slim_prepare_txn);
+
 
 /**
  * slim_do_transfer() - Process a SLIMbus-messaging transaction
