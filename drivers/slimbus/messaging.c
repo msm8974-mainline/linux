@@ -84,6 +84,7 @@ int slim_prepare_txn(struct slim_controller *ctrl, struct slim_msg_txn *txn,
 		goto err;
 
 	txn->tid = ret;
+	ret = 0;
 	if (!txn->msg->comp)
 		txn->comp = done;
 	else
