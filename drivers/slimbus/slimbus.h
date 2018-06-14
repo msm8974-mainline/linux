@@ -271,4 +271,5 @@ static inline bool slim_ec_txn(u8 mt, u8 mc)
 		 (mc >= SLIM_MSG_MC_REQUEST_VALUE &&
 		  mc <= SLIM_MSG_MC_CHANGE_VALUE)));
 }
+extern char * get_mc_name(int mc);
 #endif /* _LINUX_SLIMBUS_H */
