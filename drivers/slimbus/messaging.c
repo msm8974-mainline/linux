@@ -79,7 +79,7 @@ int slim_prepare_txn(struct slim_controller *ctrl, struct slim_msg_txn *txn,
 		return 0;
 
 	spin_lock_irqsave(&ctrl->txn_lock, flags);
-	ret = idr_alloc(&ctrl->tid_idr, txn, 0, SLIM_MAX_TIDS, GFP_ATOMIC);
+	ret = idr_alloc_cyclic(&ctrl->tid_idr, txn, 0, SLIM_MAX_TIDS, GFP_ATOMIC);
 	if (ret < 0)
 		goto err;
 
