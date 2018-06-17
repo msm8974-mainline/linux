@@ -71,15 +71,19 @@ static void __init get_krait_bin_format_b(int *speed, int *pvs, int *pvs_ver,
 		*speed = 0;
 	}
 
+	/* FIXME: This check isn't working correctly */
+
 	/* Check PVS_BLOW_STATUS */
-	pte_efuse = *(((u32 *)buf) + 4);
+/*	pte_efuse = *(((u32 *)buf) + 4);
 	if (pte_efuse) {
 		pr_info("PVS bin: %d\n", *pvs);
 	} else {
 		pr_warn("PVS bin not set. Defaulting to 0!\n");
 		*pvs = 0;
 	}
+*/
 
+	pr_info("PVS bin: %d\n", *pvs);
 	pr_info("PVS version: %d\n", *pvs_ver);
 	kfree(buf);
 }
