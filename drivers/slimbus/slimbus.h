@@ -45,9 +45,20 @@
 #define SLIM_MSG_MC_ASSIGN_LOGICAL_ADDRESS       0x2
 #define SLIM_MSG_MC_REPORT_ABSENT                0xF
 
+/* Data channel management messages */
+#define SLIM_MSG_MC_CONNECT_SOURCE		0x10
+#define SLIM_MSG_MC_CONNECT_SINK		0x11
+#define SLIM_MSG_MC_DISCONNECT_PORT		0x14
+#define SLIM_MSG_MC_CHANGE_CONTENT		0x18
+
 /* Clock pause Reconfiguration messages */
 #define SLIM_MSG_MC_BEGIN_RECONFIGURATION        0x40
 #define SLIM_MSG_MC_NEXT_PAUSE_CLOCK             0x4A
+#define SLIM_MSG_MC_NEXT_DEFINE_CHANNEL          0x50
+#define SLIM_MSG_MC_NEXT_DEFINE_CONTENT          0x51
+#define SLIM_MSG_MC_NEXT_ACTIVATE_CHANNEL        0x54
+#define SLIM_MSG_MC_NEXT_DEACTIVATE_CHANNEL      0x55
+#define SLIM_MSG_MC_NEXT_REMOVE_CHANNEL          0x58
 #define SLIM_MSG_MC_RECONFIGURE_NOW              0x5F
 
 /*
@@ -69,7 +80,16 @@
 /* Standard values per SLIMbus spec needed by controllers and devices */
 #define SLIM_MAX_CLK_GEAR		10
 #define SLIM_MIN_CLK_GEAR		1
+#define SLIM_SLOT_LEN_BITS		4
 
+/* Standard values per SLIMbus spec needed by controllers and devices */
+#define SLIM_CL_PER_SUPERFRAME		6144
+#define SLIM_CL_PER_SUPERFRAME_DIV8	(SLIM_CL_PER_SUPERFRAME >> 3)
+#define SLIM_SLOTS_PER_SUPERFRAME	(SLIM_CL_PER_SUPERFRAME >> 2)
+#define SLIM_MAX_TXNS			256
+#define SLIM_SL_PER_SUPERFRAME		(SLIM_CL_PER_SUPERFRAME >> 2)
+#define SLIM_FRM_SLOTS_PER_SUPERFRAME	16
+#define SLIM_GDE_SLOTS_PER_SUPERFRAME	2
 /* Manager's logical address is set to 0xFF per spec */
 #define SLIM_LA_MANAGER 0xFF
 
@@ -169,6 +189,88 @@ struct slim_sched {
 	struct mutex		m_reconf;
 };
 
+enum slim_port_direction {
+	SLIM_PORT_DIRECTION_INVALID = 0,  //FIXME
+	SLIM_PORT_SOURCE = 1,
+	SLIM_PORT_SINK = 2,
+};
+
+enum slim_port_state {
+	SLIM_PORT_DISCONNECTED = 0,
+	SLIM_PORT_UNCONFIGURED, /* EP in Port is connected to Channel, No data trasnmission*/
+	SLIM_PORT_CONFIGURED, /* after DEFINE_CH/CONTENT/ACTIVE */
+};
+
+enum slim_channel_state {
+	SLIM_CH_INACTIVE = 0, /* After reset or after DEACTIVATE or REMOVE CHANNEL */
+	SLIM_CH_ALLOCATED,	/* A Channel Number is allocated */
+	SLIM_CH_ASSOCIATED,	/* Channel and EP are associated with Port CONNECT_SOURCE/SINK*/
+	SLIM_CH_DEFINED,	/* DEFINE CHANNEL */
+	SLIM_CH_ACTIVE,		/* NEXT_ACTIVE_CHANNEL */
+	SLIM_CH_CONENT_DEFINED,	/* DEFINE CONENT */
+};
+
+#define SLIM_MAX_PORTS	32
+
+struct slim_port_config {
+	int num;
+//	int ch_mask;
+	enum slim_port_direction dir;
+	int port_mask; /* A SLIMBus Device may have frmo 0 to 31 Ports (inclusive) */
+};
+
+struct slim_channel_config {
+	int num;
+	int tx_ch_mask;
+	int rx_ch_mask;
+};
+
+struct slim_channel {
+	int id;
+	int ratem;
+	int seg_dist;
+	int data_len;
+	int proto;
+	int prrate;	
+	enum slim_channel_state state;
+};
+
+struct slim_port {
+	int id;
+	enum slim_port_direction direction;
+	enum slim_port_state state;
+	struct slim_channel ch;	
+};
+
+/*
+ * enum slim_ch_rate: Most commonly used frequency rate families.
+ * Use 1HZ for push-pull transport.
+ * 4KHz and 11.025KHz are most commonly used in audio applications.
+ * Typically, slimbus runs at frequencies to support channels running at 4KHz
+ * and/or 11.025KHz isochronously.
+ */
+enum slim_ch_rate {
+	SLIM_RATE_1HZ,
+	SLIM_RATE_4000HZ,
+	SLIM_RATE_11025HZ,
+};
+
+struct slim_stream_runtime {
+	struct slim_device *dev;
+	unsigned int rate;
+	unsigned int bps;
+	enum slim_stream_direction direction;
+	enum slim_channel_proto prot;
+
+	//??? FIXME
+	unsigned int ratem;
+	unsigned int baser;
+
+	int num_ports;
+	struct slim_port ports[];
+};
+
+
 /**
  * struct slim_controller  - Controls every instance of SLIMbus
  *				(similar to 'master' on SPI)
@@ -239,6 +341,12 @@ struct slim_controller {
 					     struct slim_eaddr *ea, u8 laddr);
 	int			(*get_laddr)(struct slim_controller *ctrl,
 					     struct slim_eaddr *ea, u8 *laddr);
+	int			(*alloc_bandwidth)(struct slim_stream_runtime *rt);
+	int			(*enable_stream)(struct slim_stream_runtime *rt);
+	int			(*disable_stream)(struct slim_stream_runtime *rt);
+	int			(*prepare_msg)(struct slim_controller *ctrl,
+					       struct slim_msg_txn *tx,
+					       struct completion *done);
 	int			(*wakeup)(struct slim_controller *ctrl);
 };
 
@@ -253,6 +361,7 @@ int slim_ctrl_clk_pause(struct slim_controller *ctrl, bool wakeup, u8 restart);
 int slim_prepare_txn(struct slim_controller *ctrl, struct slim_msg_txn *txn,
 		     struct completion *done, bool need_tid);
 int slim_alloc_tid(struct slim_controller *ctrl, struct slim_msg_txn *txn);
+int slim_find_prrate(int rate);
 
 static inline bool slim_tid_txn(u8 mt, u8 mc)
 {
@@ -271,5 +380,6 @@ static inline bool slim_ec_txn(u8 mt, u8 mc)
 		 (mc >= SLIM_MSG_MC_REQUEST_VALUE &&
 		  mc <= SLIM_MSG_MC_CHANGE_VALUE)));
 }
+
 extern char * get_mc_name(int mc);
 #endif /* _LINUX_SLIMBUS_H */
