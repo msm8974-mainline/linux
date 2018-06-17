@@ -315,6 +315,28 @@
 		pinctrl-0 = <&blsp1_uart2_pin_a>;
 	};
 
+	blsp2_uart1: serial@f995d000 {
+		status = "ok";
+
+		pinctrl-names = "default";
+		pinctrl-0 = <&blsp2_uart1_pin_a>;
+
+		bluetooth {
+			status = "ok";
+			compatible = "brcm,bcm43438-bt";
+			max-speed = <3000000>;
+
+			pinctrl-names = "default";
+			pinctrl-0 = <&bt_host_wake_pin>,
+				    <&bt_dev_wake_pin>,
+				    <&bt_reg_on_pin>;
+
+			host-wakeup-gpios = <&msmgpio 95 GPIO_ACTIVE_HIGH>;
+			device-wakeup-gpios = <&msmgpio 96 GPIO_ACTIVE_HIGH>;
+			shutdown-gpios = <&pm8941_gpios 16 GPIO_ACTIVE_HIGH>;
+		};
+	};
+
 	usb@f9a55000 {
 		status = "ok";
 
@@ -463,6 +485,23 @@
 				drive-strength = <10>;
 				bias-pull-up;
 			};
+		};
+
+		bt_host_wake_pin: bt-host-wake {
+			pins = "gpio95";
+			function = "gpio";
+
+			drive-strenght = <2>;
+			bias-disable;
+			output-low;
+		};
+
+		bt_dev_wake_pin: bt-dev-wake {
+			pins = "gpio96";
+			function = "gpio";
+
+			drive-strenght = <2>;
+			bias-disable;
 		};
 	};
 
