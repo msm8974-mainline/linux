@@ -828,7 +828,7 @@
 				reg  = <0 0>;
 			};
 
-			wcd9320: wcd {
+			wcd_slim: wcdslim {
 				compatible = "slim217,a0";
 				reg  = <1 0>;
 
@@ -856,8 +856,14 @@
 				vddcx-2-supply = <&pm8941_l1>;
 
 				ifd = <&wcd_ifd>;
+				
+				wcd9320: wcd {
+					compatible = "qcom,wcd9320";
+					status = "ok";
+					#sound-dai-cells = <1>;
+				};
 
-				#sound-dai-cells = <1>;
+
 					
 			};
 		};

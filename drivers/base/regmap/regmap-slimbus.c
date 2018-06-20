@@ -39,7 +39,6 @@ static int regmap_slimbus_write(void *context, const void *data, size_t count)
 	unsigned short reg;
 
 	reg = *(u16 *)data + 0x800;
-
 	return slim_write(sdev, reg, count - REG_BYTES, data + REG_BYTES);
 }
 

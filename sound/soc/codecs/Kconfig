@@ -1059,7 +1059,15 @@ config SND_SOC_WCD9335
 	select REGMAP_IRQ
 	select REGMAP_SLIMBUS
 	select MFD_CORE
-        tristate
+	tristate
+
+config SND_SOC_WCD9320
+	tristate "WCD9320 Codec"
+	select SLIMBUS
+	select REGMAP_IRQ
+	select REGMAP_SLIMBUS
+	select MFD_CORE
+	tristate
 
 config SND_SOC_WL1273
 	tristate

@@ -41,8 +41,8 @@ struct wcd_slim_data {
 	u32 num_tx_port;
 };
 
-#define WCD9335_RX_SLAVE_PORTS	16
-#define WCD9335_TX_SLAVE_PORTS	16
+#define WCD93XX_RX_SLAVE_PORTS	16
+#define WCD93XX_TX_SLAVE_PORTS	16
 #define SLIM_MAX_TX_PORTS 16
 #define SLIM_MAX_RX_PORTS 16
 

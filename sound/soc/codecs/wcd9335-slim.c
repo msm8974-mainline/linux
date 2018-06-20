@@ -403,8 +403,8 @@ static int wcd9335_slim_probe(struct slim_device *slim)
 	wcd->slim_data.slim = slim;
 	wcd->slim_data.regmap = wcd->regmap;
 	//FIXME
-	wcd->slim_data.rx_port_ch_reg_base = 0x180 - (WCD9335_RX_SLAVE_PORTS * 4);
-	wcd->slim_data.port_rx_cfg_reg_base = 0x040 - WCD9335_RX_SLAVE_PORTS;
+	wcd->slim_data.rx_port_ch_reg_base = 0x180 - (WCD93XX_RX_SLAVE_PORTS * 4);
+	wcd->slim_data.port_rx_cfg_reg_base = 0x040 - WCD93XX_RX_SLAVE_PORTS;
 	wcd->slim_data.port_tx_cfg_reg_base = 0x050;
 
 
