@@ -6,6 +6,7 @@
 #include <dt-bindings/clock/qcom,rpmcc.h>
 #include <dt-bindings/reset/qcom,gcc-msm8974.h>
 #include <dt-bindings/gpio/gpio.h>
+#include <dt-bindings/soc/qcom,apr.h>
 #include "skeleton.dtsi"
 
 / {
@@ -1277,6 +1278,36 @@
 				};
 			};
 		};
+
+                slimbam: dma-controller@fe104000 {
+                        compatible = "qcom,bam-v1.4.0";
+                        reg = <0xfe104000 0x20000>;
+
+                        interrupts = <0 164 IRQ_TYPE_LEVEL_HIGH>;
+
+			num-channels = <31>;
+			qcom,controlled-remotely;
+			qcom,ee = <1>;
+			qcom,num-ees = <2>;
+
+                        #dma-cells = <1>;
+                };      
+
+		slim_msm: slim@fe12f000 {
+			cell-index = <1>;
+			compatible = "qcom,slim-ngd-v1.5.0";
+			reg = <0xfe12f000 0x35000>;
+			interrupts = <0 163 IRQ_TYPE_LEVEL_HIGH>;
+			dmas =	<&slimbam 3>, <&slimbam 4>;
+			dma-names = "rx", "tx";
+			#address-cells = <1>;
+			#size-cells = <0>;
+			ngd@1 {
+				reg = <1>;
+				#address-cells = <1>;
+				#size-cells = <1>;
+			};
+		};
 	};
 
 	smd {
@@ -1288,6 +1319,46 @@
 			qcom,ipc = <&apcs 8 8>;
 			qcom,smd-edge = <1>;
 
+			#size-cells = <0>;
+			#address-cells = <1>;
+			apr {
+				compatible = "qcom,apr-v2";
+				qcom,smd-channels = "apr_audio_svc";
+				reg = <APR_DOMAIN_ADSP>;
+
+				#size-cells = <0>;
+				#address-cells = <1>;
+				q6core {
+					reg = <APR_SVC_ADSP_CORE>;
+					compatible = "qcom,q6core";
+				};
+
+				q6afe: q6afe {
+					compatible = "qcom,q6afe";
+					reg = <APR_SVC_AFE>;
+					q6afedai: dais {
+						#sound-dai-cells = <1>;
+						#address-cells = <1>;
+						#size-cells = <0>;
+					};
+				};
+
+				q6asm: q6asm {
+					compatible = "qcom,q6asm";
+					reg = <APR_SVC_ASM>;
+					q6asmdai: dais {
+						#sound-dai-cells = <1>;
+					};
+				};
+
+				q6adm: q6adm {
+					compatible = "qcom,q6adm";
+					reg = <APR_SVC_ADM>;
+					q6routing: routing {
+						#sound-dai-cells = <0>;
+					};
+				};
+			};
 		};
 
 		modem {

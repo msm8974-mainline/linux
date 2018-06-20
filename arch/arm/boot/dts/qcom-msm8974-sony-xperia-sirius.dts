@@ -6,6 +6,8 @@
 #include <dt-bindings/clock/qcom,mmcc-msm8974.h>
 #include <dt-bindings/input/input.h>
 #include <dt-bindings/pinctrl/qcom,pmic-gpio.h>
+#include <dt-bindings/sound/qcom,q6afe.h>
+#include <dt-bindings/sound/qcom,q6asm.h>
 
 / {
 	model = "Sony Xperia Z2";
@@ -62,6 +64,27 @@
 	smd {
 		rpm {
 			rpm_requests {
+				pm8841-regulators {
+					status = "okay";
+					s1 {
+						regulator-min-microvolt = <675000>;
+						regulator-max-microvolt = <1050000>;
+						regulator-allow-set-load;
+					};
+
+					s2 {
+						regulator-min-microvolt = <500000>;
+						regulator-max-microvolt = <1050000>;
+						regulator-allow-set-load;
+					};
+
+					s3 {
+						regulator-min-microvolt = <1050000>;
+						regulator-max-microvolt = <1050000>;
+						regulator-allow-set-load;
+					};
+				};
+			
 				pm8941-regulators {
 					status = "okay";
 					vdd_l1_l3-supply = <&pm8941_s1>;
@@ -334,6 +357,34 @@
 			host-wakeup-gpios = <&msmgpio 95 GPIO_ACTIVE_HIGH>;
 			device-wakeup-gpios = <&msmgpio 96 GPIO_ACTIVE_HIGH>;
 			shutdown-gpios = <&pm8941_gpios 16 GPIO_ACTIVE_HIGH>;
+		};
+	};
+
+	audio {
+		compatible = "qcom,apq8096-sndcard";
+		qcom,model = "sirius";
+		
+		status = "ok";
+		fe@1 {
+			link-name = "MultiMedia1 Playback";
+			cpu {
+				sound-dai = <&q6asmdai MSM_FRONTEND_DAI_MULTIMEDIA1>;
+			};
+		};
+
+		be@1 {
+			link-name = "Slimbus Playback";
+			cpu {
+				sound-dai = <&q6afedai SLIMBUS_0_RX>;
+			};
+
+			platform {
+				sound-dai = <&q6routing>;
+			};
+
+			codec {
+				sound-dai = <&wcd9320 0>;
+			};
 		};
 	};
 
@@ -770,6 +821,47 @@
 		};
 	};
 
+	slim@fe12f000 {
+		ngd@1 {
+			wcd_ifd: ifd {
+				compatible = "slim217,a0";
+				reg  = <0 0>;
+			};
+
+			wcd9320: wcd {
+				compatible = "slim217,a0";
+				reg  = <1 0>;
+
+				clocks = <&pm8941_clk_divs 1>;
+				clock-names = "clk";
+
+				pinctrl-names = "default";
+				pinctrl-0 = <&codec_mclk>;
+
+				#address-cells = <1>;
+				#size-cells = <0>;
+				
+				qcom,gpio-int2 = <&msmgpio 72 0>;
+				qcom,reset-gpio = <&msmgpio 63 0>;
+				qcom,clk-gpio = <&pm8941_gpios 15 0>;
+				qcom,codec-clk-rate = <9600000>;
+
+				vdd-buck-supply = <&pm8941_s2>;
+				vdd-tx-h-supply = <&pm8941_s3>;
+				vdd-rx-h-supply = <&pm8941_s3>;
+				vddpx-1-supply = <&pm8941_s3>;
+
+				vdd-a-1p2v-supply = <&pm8941_l1>;
+				vddcx-1-supply = <&pm8941_l1>;
+				vddcx-2-supply = <&pm8941_l1>;
+
+				ifd = <&wcd_ifd>;
+
+				#sound-dai-cells = <1>;
+					
+			};
+		};
+	};
 };
 
 &spmi_bus {
@@ -870,6 +962,14 @@
 				function = "normal";
 
 				bias-disable;
+				power-source = <PM8941_GPIO_S3>;
+			};
+
+			codec_mclk: codec-mclk {
+				pins = "gpio15";
+				function = "func1";
+
+				output-high;
 				power-source = <PM8941_GPIO_S3>;
 			};
 		};
