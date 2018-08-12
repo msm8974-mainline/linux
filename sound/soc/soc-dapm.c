@@ -712,6 +712,11 @@ static int dapm_connect_mux(struct snd_soc_dapm_context *dapm,
 	unsigned int val, item;
 	int i;
 
+	if(e == NULL)
+		return 0;
+	if(e->reg == NULL)
+		printk("NAN \n");
+
 	if (e->reg != SND_SOC_NOPM) {
 		soc_dapm_read(dapm, e->reg, &val);
 		val = (val >> e->shift_l) & e->mask;

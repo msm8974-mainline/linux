@@ -304,7 +304,7 @@ static int wcd9320_slim_status(struct slim_device *sdev,
 	struct device *dev;
 	struct device_node *ifd_np = NULL;
 
-	printk("slim PING");
+	printk("slim PING \n");
 	// Interface device
 	if (sdev->e_addr.dev_index == 0)
 		return 0;
