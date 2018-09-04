@@ -363,7 +363,9 @@
 	audio {
 		compatible = "qcom,apq8096-sndcard";
 		qcom,model = "sirius";
-		
+	
+		clocks = <&pm8941_clk_divs 1>;
+		clock-names = "clk";
 		status = "ok";
 		fe@1 {
 			link-name = "MultiMedia1 Playback";
@@ -373,9 +375,9 @@
 		};
 
 		be@1 {
-			link-name = "Slimbus Playback";
+			link-name = "QUAT MI2S Playback";
 			cpu {
-				sound-dai = <&q6afedai SLIMBUS_0_RX>;
+				sound-dai = <&q6afedai QUATERNARY_MI2S_RX>;
 			};
 
 			platform {
@@ -383,7 +385,7 @@
 			};
 
 			codec {
-				sound-dai = <&wcd9320 0>;
+				sound-dai = <&tfa_right>;
 			};
 		};
 	};
@@ -460,6 +462,16 @@
 			rts {
 				pins = "gpio44";
 				function = "blsp_uart7";
+
+				drive-strength = <2>;
+				bias-disable;
+			};
+		};
+
+		i2c11_pins: i2c11 {
+			mux {
+				pins = "gpio83", "gpio84";
+				function = "blsp_i2c11";
 
 				drive-strength = <2>;
 				bias-disable;
@@ -555,6 +567,35 @@
 			bias-disable;
 		};
 	};
+
+
+	i2c@f9967000 {
+		status = "ok";
+
+		pinctrl-names = "default";
+		pinctrl-0 = <&i2c11_pins>;
+		clock-frequency = <355000>;
+		qcom,src-freq = <50000000>;
+
+
+/*		tfa_left: tfa9890@68 {
+			compatible = "nxp,tfa9890";
+			reg = <0x68>;
+			nxp,tfa_max-vol-steps = <15>;
+			nxp,tfa-dev = "left";
+			nxp,tfa-firmware-part-name = "boost";
+		};*/
+		tfa_right: tfa9890@34 {
+			compatible = "nxp,tfa9890";
+
+			#sound-dai-cells = <0>;
+			reg = <0x34>;
+			nxp,tfa-dev = "left";
+			nxp,tfa_max-vol-steps = <15>;
+			nxp,tfa-firmware-part-name = "boost";
+		};
+	};
+
 
 	i2c@f9964000 {
 		status = "ok";
@@ -820,7 +861,7 @@
 			#phy-cells = <0>;
 		};
 	};
-
+/*
 	slim@fe12f000 {
 		ngd@1 {
 			wcd_ifd: ifd {
@@ -868,6 +909,7 @@
 			};
 		};
 	};
+	*/
 };
 
 &spmi_bus {

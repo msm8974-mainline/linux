@@ -8,10 +8,15 @@
 #include <linux/of_device.h>
 #include <sound/soc.h>
 #include <sound/soc-dapm.h>
+#include <linux/clk.h>
 #include <sound/pcm.h>
+#include "qdsp6/q6afe.h"
 
 #define SLIM_MAX_TX_PORTS 16
 #define SLIM_MAX_RX_PORTS 16
+#define DEFAULT_SAMPLE_RATE_48K		48000
+#define DEFAULT_MCLK_RATE		9600000
+#define DEFAULT_BCLK_RATE		12288000
 
 static int msm_snd_hw_params(struct snd_pcm_substream *substream,
 			     struct snd_pcm_hw_params *params)
@@ -19,40 +24,18 @@ static int msm_snd_hw_params(struct snd_pcm_substream *substream,
 	struct snd_soc_pcm_runtime *rtd = substream->private_data;
 	struct snd_soc_dai *codec_dai = rtd->codec_dai;
 	struct snd_soc_dai *cpu_dai = rtd->cpu_dai;
-	int ret = 0;
-	u32 rx_ch[SLIM_MAX_RX_PORTS], tx_ch[SLIM_MAX_TX_PORTS];
-	u32 rx_ch_cnt = 0, tx_ch_cnt = 0;
-
-	if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK) {
-/*		ret = snd_soc_dai_get_channel_map(codec_dai,
-					&tx_ch_cnt, tx_ch, &rx_ch_cnt , rx_ch);
-               if (ret != 0 && ret != -ENOTSUPP) {
-			pr_err("%s: failed to get codec chan map, err:%d\n",
-				__func__, ret);
-			goto end;
-		} else if (ret == -ENOTSUPP) {
-			return 0;
-		}
-*/
-	unsigned int rx_ch[16] = {144, 145, 146, 147, 148, 149, 150,
-					    151, 152, 153, 154, 155, 156};
-	unsigned int tx_ch[16] = {128, 129, 130, 131, 132, 133,
-				    134, 135, 136, 137, 138, 139,
-					    140, 141, 142, 143};
 
 
-		ret = snd_soc_dai_set_channel_map(cpu_dai, 0, 0,
-						  ARRAY_SIZE(rx_ch), rx_ch);
-               if (ret != 0 && ret != -ENOTSUPP) {
-			pr_err("%s: failed to set cpu chan map, err:%d\n",
-				__func__, ret);
-			goto end;
-		}
-	} else {
-		/* TX not supported yet in wcd */
-	}
+	snd_soc_dai_set_sysclk(cpu_dai, LPAIF_BIT_CLK, 1536000, SNDRV_PCM_STREAM_PLAYBACK);
+	snd_soc_dai_set_sysclk(cpu_dai, LPAIF_OSR_CLK, 0xBB8000, SNDRV_PCM_STREAM_PLAYBACK);
+	snd_soc_dai_set_sysclk(cpu_dai, Q6AFE_LPASS_CLK_ID_MCLK_1,
+				DEFAULT_MCLK_RATE, SNDRV_PCM_STREAM_PLAYBACK);
+	snd_soc_dai_set_sysclk(cpu_dai, Q6AFE_LPASS_CLK_ID_QUAD_MI2S_IBIT,
+				DEFAULT_BCLK_RATE, SNDRV_PCM_STREAM_PLAYBACK);
+
+
 end:
-	return ret;
+	return 0;
 }
 
 
@@ -64,20 +47,21 @@ static int msm_audrx_init(struct snd_soc_pcm_runtime *rtd)
 {
 	struct snd_soc_dapm_context *dapm = &rtd->card->dapm;
 	struct snd_soc_dai *codec_dai = rtd->codec_dai;
+	struct snd_soc_dai *cpu_dai = rtd->cpu_dai;
 
 	/* Codec SLIMBUS configuration
 	 * RX1, RX2, RX3, RX4, RX5, RX6, RX7, RX8, RX9, RX10, RX11, RX12, RX13
 	 * TX1, TX2, TX3, TX4, TX5, TX6, TX7, TX8, TX9, TX10, TX11, TX12, TX13
 	 * TX14, TX15, TX16
 	 */
-	unsigned int rx_ch[16] = {144, 145, 146, 147, 148, 149, 150,
-					    151, 152, 153, 154, 155, 156};
-	unsigned int tx_ch[16] = {128, 129, 130, 131, 132, 133,
-				    134, 135, 136, 137, 138, 139,
-					    140, 141, 142, 143};
 
-	snd_soc_dai_set_channel_map(codec_dai, ARRAY_SIZE(tx_ch),
-				    tx_ch, ARRAY_SIZE(rx_ch), rx_ch);
+	snd_soc_dai_set_fmt(cpu_dai, SND_SOC_DAIFMT_CBS_CFS);
+	snd_soc_dai_set_sysclk(cpu_dai, LPAIF_BIT_CLK, 1536000, SNDRV_PCM_STREAM_PLAYBACK);
+	snd_soc_dai_set_sysclk(cpu_dai, LPAIF_OSR_CLK, 0xBB8000, SNDRV_PCM_STREAM_PLAYBACK);
+	snd_soc_dai_set_sysclk(cpu_dai, Q6AFE_LPASS_CLK_ID_MCLK_1,
+				DEFAULT_MCLK_RATE, SNDRV_PCM_STREAM_PLAYBACK);
+	snd_soc_dai_set_sysclk(cpu_dai, Q6AFE_LPASS_CLK_ID_QUAD_MI2S_IBIT,
+				DEFAULT_BCLK_RATE, SNDRV_PCM_STREAM_PLAYBACK);
 
 	return 0;
 }
@@ -292,6 +276,11 @@ static int apq8096_platform_probe(struct platform_device *pdev)
 {
 	struct component_match *match = NULL;
 	int ret;
+	struct clk *clk;
+	clk = devm_clk_get(&pdev->dev, "clk");
+        clk_set_rate(clk, 9600000);
+
+
 
 	ret = add_audio_components(&pdev->dev, &match);
 	if (ret)

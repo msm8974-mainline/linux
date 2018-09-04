@@ -911,6 +911,22 @@
 			interrupt-controller;
 			#interrupt-cells = <2>;
 			interrupts = <0 208 0>;
+
+			ext-quat-lines {
+				quat_i2s_act: tlmm_lines_on {
+					pinmux {
+						function = "qua_mi2s";
+						pins = "gpio58", "gpio59", "gpio60",
+						       "gpio61";
+						};
+					pinconf {
+						pins = "gpio58", "gpio59", "gpio60",
+							"gpio61";
+						drive-strength = <2>;
+						bias-pull-none;
+					};
+				};
+			};
 		};
 
 		i2c@f9923000 {
@@ -1337,9 +1353,50 @@
 					compatible = "qcom,q6afe";
 					reg = <APR_SVC_AFE>;
 					q6afedai: dais {
+						compatible = "qcom,q6afe-dais";
+						pinctrl-0 = <&quat_i2s_act>;
 						#sound-dai-cells = <1>;
 						#address-cells = <1>;
 						#size-cells = <0>;
+
+						prim-mi2s-rx@16 {
+							reg = <16>;
+							qcom,sd-lines = <1>;
+						};
+
+						prim-mi2s-tx@17 {
+							reg = <17>;
+							qcom,sd-lines = <2>;
+						};
+						sec-mi2s-rx@18 {
+							reg = <18>;
+							qcom,sd-lines = <1>;
+						};
+
+						sec-mi2s-tx@19 {
+							reg = <19>;
+							qcom,sd-lines = <2>;
+						};
+
+						tert-mi2s-rx@20 {
+							reg = <20>;
+							qcom,sd-lines = <2>;
+						};
+
+						tert-mi2s-tx@21 {
+							reg = <21>;
+							qcom,sd-lines = <1>;
+						};
+
+						quat-mi2s-rx@22 {
+							reg = <22>;
+							qcom,sd-lines = <1>;
+						};
+
+						quat-mi2s-tx@23 {
+							reg = <23>;
+							qcom,sd-lines = <2>;
+						};
 					};
 				};
 
