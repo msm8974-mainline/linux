@@ -19,18 +19,18 @@
 		#size-cells = <1>;
 		ranges;
 
-		mpss@8000000 {
-			reg = <0x08000000 0x5100000>;
+		mpss_region: mpss@8000000 {
+			reg = <0x08000000 0x5800000>;
 			no-map;
 		};
 
-		mba@d100000 {
-			reg = <0x0d100000 0x100000>;
+		mba_region: mba@d800000 {
+			reg = <0x0d800000 0x100000>;
 			no-map;
 		};
 
-		reserved@d200000 {
-			reg = <0x0d200000 0xa00000>;
+		reserved@d900000 {
+			reg = <0x0d900000 0x300000>;
 			no-map;
 		};
 
@@ -60,8 +60,10 @@
 		};
 
 		rmtfs@fd80000 {
+			compatible = "qcom,rmtfs-mem";
 			reg = <0x0fd80000 0x180000>;
 			no-map;
+			qcom,client-id = <1>;
 		};
 	};
 
@@ -265,6 +267,51 @@
 
 		qcom,smem-states = <&adsp_smp2p_out 0>;
 		qcom,smem-state-names = "stop";
+	};
+
+	modem-rproc@fc880000 {
+		compatible = "qcom,msm8974-mss-pil";
+		reg = <0xfc880000 0x100>,
+		      <0xfc820000 0x020>;
+		reg-names = "qdsp6", "rmb";
+
+		interrupts-extended = <&intc 0 24 1>,
+				      <&modem_smp2p_in 0 0>,
+				      <&modem_smp2p_in 1 0>,
+				      <&modem_smp2p_in 2 0>,
+				      <&modem_smp2p_in 3 0>;
+		interrupt-names = "wdog",
+				  "fatal",
+				  "ready",
+				  "handover",
+				  "stop-ack";
+
+		clocks = <&gcc GCC_MSS_Q6_BIMC_AXI_CLK>,
+			 <&gcc GCC_MSS_CFG_AHB_CLK>,
+			 <&gcc GCC_BOOT_ROM_AHB_CLK>,
+			 <&xo_board>;
+		clock-names = "iface", "bus", "mem", "xo";
+
+		qcom,halt-regs = <&tcsr_mutex_block 0x1180 0x1200 0x1280>;
+
+		resets = <&gcc GCC_MSS_RESTART>;
+		reset-names = "mss_restart";
+
+		cx-supply = <&pm8841_s2>;
+		mss-supply = <&pm8841_s3>;
+		mx-supply = <&pm8841_s1>;
+		pll-supply = <&pm8941_l12>;
+
+		qcom,smem-states = <&modem_smp2p_out 0>;
+		qcom,smem-state-names = "stop";
+
+		mba {
+			memory-region = <&mba_region>;
+		};
+
+		mpss {
+			memory-region = <&mpss_region>;
+		};
 	};
 
 	smem {
