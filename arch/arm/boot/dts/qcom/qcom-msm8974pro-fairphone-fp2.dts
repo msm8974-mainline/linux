@@ -105,12 +105,55 @@
 	status = "okay";
 };
 
+&gpu {
+	status = "okay";
+};
+
 &imem {
 	reboot-mode {
 		mode-normal = <0x77665501>;
 		mode-bootloader = <0x77665500>;
 		mode-recovery = <0x77665502>;
 	};
+};
+
+&mdss {
+	status = "okay";
+};
+
+&mdss_dsi0 {
+	status = "okay";
+
+	vdda-supply = <&pm8941_l2>;
+	vdd-supply = <&pm8941_l22>;
+	vddio-supply = <&pm8941_l12>;
+
+	panel: panel@0 {
+		reg = <0>;
+		compatible = "fairphone,fp2-panel";
+
+		reset-gpios = <&pm8941_gpios 19 GPIO_ACTIVE_LOW>;
+
+		pinctrl-names = "default";
+		pinctrl-0 = <&panel_te_pin>;
+
+		port {
+			panel_in: endpoint {
+				remote-endpoint = <&mdss_dsi0_out>;
+			};
+		};
+	};
+};
+
+&mdss_dsi0_out {
+	remote-endpoint = <&panel_in>;
+	data-lanes = <0 1 2 3>;
+};
+
+&mdss_dsi0_phy {
+	status = "okay";
+
+	vddio-supply = <&pm8941_l12>;
 };
 
 &pm8941_gpios {
@@ -465,6 +508,13 @@
 			drive-strength = <2>;
 			bias-pull-down;
 		};
+	};
+
+	panel_te_pin: panel-te-state {
+		pins = "gpio12";
+		function = "mdp_vsync";
+		drive-strength = <2>;
+		bias-disable;
 	};
 };
 
