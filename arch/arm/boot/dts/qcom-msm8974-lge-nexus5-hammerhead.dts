@@ -263,6 +263,10 @@
 	vddio-supply = <&pm8941_l12>;
 };
 
+&gpu {
+	status = "okay";
+};
+
 &mdss {
 	status = "okay";
 };
