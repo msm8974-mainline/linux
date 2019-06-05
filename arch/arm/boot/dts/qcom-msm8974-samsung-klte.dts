@@ -8,8 +8,6 @@
 / {
 	model = "Samsung Galaxy S5";
 	compatible = "samsung,klte", "qcom,msm8974";
-	qcom,msm-id = <0xC208FF01 0x10000>;
-	qcom,board-id = <0xE 0x0>;
 
 	aliases {
 		serial0 = &blsp1_uart1;
