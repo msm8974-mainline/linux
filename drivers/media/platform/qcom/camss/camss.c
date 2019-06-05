@@ -14,6 +14,7 @@
 #include <linux/platform_device.h>
 #include <linux/of.h>
 #include <linux/of_graph.h>
+#include <linux/of_device.h>
 #include <linux/pm_runtime.h>
 #include <linux/pm_domain.h>
 #include <linux/slab.h>
@@ -30,6 +31,112 @@
 #define CAMSS_CLOCK_MARGIN_NUMERATOR 105
 #define CAMSS_CLOCK_MARGIN_DENOMINATOR 100
 
+#if 1
+
+#define CSIPHY_8974(x) \
+	{ \
+		.regulator = (const char*[]) { NULL }, \
+		.clock = (const char*[]) { \
+			"top_ahb", \
+			"ispif_ahb", \
+			"csiphy"#x"_timer", \
+			NULL \
+		}, \
+		.clock_rate = (const u32*[]) { \
+			(const u32[]) {0}, \
+			(const u32[]) {0}, \
+			(const u32[]) {100000000, 200000000, 0}, \
+		}, \
+		.reg = (const char*[]) {"csiphy"#x, "csiphy"#x"_clk_mux", NULL}, \
+		.interrupt = (const char*[]) {"csiphy"#x, NULL}, \
+	}
+
+#define CSID_8974(x) \
+	{ \
+		.regulator = (const char*[]) { "vdda", NULL }, \
+		.clock = (const char*[]) { \
+			"top_ahb", \
+			"ispif_ahb", \
+			"csi"#x"_ahb", \
+			"csi"#x"", \
+			"csi"#x"_phy", "csi"#x"_pix", "csi"#x"_rdi", \
+			NULL \
+		}, \
+		.clock_rate = (const u32*[]) { \
+			(const u32[]) {0}, \
+			(const u32[]) {0}, \
+			(const u32[]) {0}, \
+			(const u32[]) {100000000, 200000000, 0}, \
+			(const u32[]) {0}, \
+			(const u32[]) {0}, \
+			(const u32[]) {0}, \
+		}, \
+		.reg = (const char*[]) {"csid"#x, NULL}, \
+		.interrupt = (const char*[]) {"csid"#x, NULL}, \
+	}
+
+#define VFE_8974(x) \
+	{ \
+		.regulator = (const char*[]) { NULL }, \
+		.clock = (const char*[]) { \
+			"top_ahb", \
+			"vfe"#x, \
+			"csi_vfe"#x, \
+			"iface", \
+			"bus", \
+			NULL \
+		}, \
+		.clock_rate = (const u32*[]) { \
+			(const u32[]) {0}, \
+			(const u32[]) {50000000, 80000000, 100000000, 160000000, \
+			  177780000, 200000000, 266670000, 320000000, \
+			  400000000, 400000000, 0}, \
+			(const u32[]) {0}, \
+			(const u32[]) {0}, \
+			(const u32[]) {0}, \
+		}, \
+		.reg = (const char*[]) {"vfe"#x, NULL}, \
+		.interrupt = (const char*[]) {"vfe"#x, NULL}, \
+ 	}
+
+static const struct resources csiphy_res[] = {
+	CSIPHY_8974(0),
+	CSIPHY_8974(1),
+	CSIPHY_8974(2),
+};
+
+static const struct resources csid_res[] = {
+	CSID_8974(0),
+	CSID_8974(1),
+	CSID_8974(2),
+	CSID_8974(3),
+};
+
+static const struct resources vfe_res[] = {
+	VFE_8974(0),
+	VFE_8974(1),
+};
+
+static const struct resources_ispif ispif_res = {
+	/* ISPIF */
+	.clock = (const char*[]) { "top_ahb", "ispif_ahb",
+ 		   "csi0", "csi0_pix", "csi0_rdi",
+		   "csi1", "csi1_pix", "csi1_rdi",
+		   "csi2", "csi2_pix", "csi2_rdi",
+		   "csi3", "csi3_pix", "csi3_rdi",
+		   NULL,
+	},
+	.clock_for_reset = (const char*[]) {
+		"vfe0", "csi_vfe0",
+		"vfe1", "csi_vfe1",
+		NULL,
+	},
+	.reg = (const char*[]) { "ispif", "csi_clk_mux", NULL },
+	.interrupt = "ispif"
+
+};
+
+#else
 static const struct resources csiphy_res_8x16[] = {
 	/* CSIPHY0 */
 	{
@@ -129,7 +236,7 @@ static const struct resources csiphy_res_8x96[] = {
 	/* CSIPHY0 */
 	{
 		.regulator = { NULL },
-		.clock = { "top_ahb", "ispif_ahb", "ahb", "csiphy0_timer" },
+		.clock = { "top_ahb", "ispif_ahb", "csiphy0_timer" },
 		.clock_rate = { { 0 },
 				{ 0 },
 				{ 0 },
@@ -141,7 +248,7 @@ static const struct resources csiphy_res_8x96[] = {
 	/* CSIPHY1 */
 	{
 		.regulator = { NULL },
-		.clock = { "top_ahb", "ispif_ahb", "ahb", "csiphy1_timer" },
+		.clock = { "top_ahb", "ispif_ahb", "csiphy1_timer" },
 		.clock_rate = { { 0 },
 				{ 0 },
 				{ 0 },
@@ -153,7 +260,7 @@ static const struct resources csiphy_res_8x96[] = {
 	/* CSIPHY2 */
 	{
 		.regulator = { NULL },
-		.clock = { "top_ahb", "ispif_ahb", "ahb", "csiphy2_timer" },
+		.clock = { "top_ahb", "ispif_ahb", "csiphy2_timer" },
 		.clock_rate = { { 0 },
 				{ 0 },
 				{ 0 },
@@ -167,7 +274,7 @@ static const struct resources csid_res_8x96[] = {
 	/* CSID0 */
 	{
 		.regulator = { "vdda" },
-		.clock = { "top_ahb", "ispif_ahb", "csi0_ahb", "ahb",
+		.clock = { "top_ahb", "ispif_ahb", "csi0_ahb",
 			   "csi0", "csi0_phy", "csi0_pix", "csi0_rdi" },
 		.clock_rate = { { 0 },
 				{ 0 },
@@ -184,7 +291,7 @@ static const struct resources csid_res_8x96[] = {
 	/* CSID1 */
 	{
 		.regulator = { "vdda" },
-		.clock = { "top_ahb", "ispif_ahb", "csi1_ahb", "ahb",
+		.clock = { "top_ahb", "ispif_ahb", "csi1_ahb",
 			   "csi1", "csi1_phy", "csi1_pix", "csi1_rdi" },
 		.clock_rate = { { 0 },
 				{ 0 },
@@ -201,7 +308,7 @@ static const struct resources csid_res_8x96[] = {
 	/* CSID2 */
 	{
 		.regulator = { "vdda" },
-		.clock = { "top_ahb", "ispif_ahb", "csi2_ahb", "ahb",
+		.clock = { "top_ahb", "ispif_ahb", "csi2_ahb",
 			   "csi2", "csi2_phy", "csi2_pix", "csi2_rdi" },
 		.clock_rate = { { 0 },
 				{ 0 },
@@ -218,7 +325,7 @@ static const struct resources csid_res_8x96[] = {
 	/* CSID3 */
 	{
 		.regulator = { "vdda" },
-		.clock = { "top_ahb", "ispif_ahb", "csi3_ahb", "ahb",
+		.clock = { "top_ahb", "ispif_ahb", "csi3_ahb",
 			   "csi3", "csi3_phy", "csi3_pix", "csi3_rdi" },
 		.clock_rate = { { 0 },
 				{ 0 },
@@ -235,7 +342,7 @@ static const struct resources csid_res_8x96[] = {
 
 static const struct resources_ispif ispif_res_8x96 = {
 	/* ISPIF */
-	.clock = { "top_ahb", "ahb", "ispif_ahb",
+	.clock = { "top_ahb", "ispif_ahb",
 		   "csi0", "csi0_pix", "csi0_rdi",
 		   "csi1", "csi1_pix", "csi1_rdi",
 		   "csi2", "csi2_pix", "csi2_rdi",
@@ -249,7 +356,7 @@ static const struct resources vfe_res_8x96[] = {
 	/* VFE0 */
 	{
 		.regulator = { NULL },
-		.clock = { "top_ahb", "ahb", "vfe0", "csi_vfe0", "vfe_ahb",
+		.clock = { "top_ahb", "vfe0", "csi_vfe0", "vfe_ahb",
 			   "vfe0_ahb", "vfe_axi", "vfe0_stream"},
 		.clock_rate = { { 0 },
 				{ 0 },
@@ -267,7 +374,7 @@ static const struct resources vfe_res_8x96[] = {
 	/* VFE1 */
 	{
 		.regulator = { NULL },
-		.clock = { "top_ahb", "ahb", "vfe1", "csi_vfe1", "vfe_ahb",
+		.clock = { "top_ahb", "vfe1", "csi_vfe1", "vfe_ahb",
 			   "vfe1_ahb", "vfe_axi", "vfe1_stream"},
 		.clock_rate = { { 0 },
 				{ 0 },
@@ -282,6 +389,7 @@ static const struct resources vfe_res_8x96[] = {
 		.interrupt = { "vfe1" }
 	}
 };
+#endif
 
 /*
  * camss_add_clock_margin - Add margin to clock frequency rate
@@ -385,12 +493,12 @@ int camss_get_pixel_clock(struct media_entity *entity, u32 *pixel_clock)
 
 	subdev = media_entity_to_v4l2_subdev(sensor);
 
-	ctrl = v4l2_ctrl_find(subdev->ctrl_handler, V4L2_CID_PIXEL_RATE);
+	//ctrl = v4l2_ctrl_find(subdev->ctrl_handler, V4L2_CID_PIXEL_RATE);
 
-	if (!ctrl)
-		return -EINVAL;
+	//if (!ctrl)
+	//	return -EINVAL;
 
-	*pixel_clock = v4l2_ctrl_g_ctrl_int64(ctrl);
+	*pixel_clock = 259200000; //v4l2_ctrl_g_ctrl_int64(ctrl);
 
 	return 0;
 }
@@ -517,18 +625,19 @@ err_cleanup:
  */
 static int camss_init_subdevices(struct camss *camss)
 {
-	const struct resources *csiphy_res;
-	const struct resources *csid_res;
-	const struct resources_ispif *ispif_res;
-	const struct resources *vfe_res;
+	//const struct resources *csiphy_res;
+	//const struct resources *csid_res;
+	//const struct resources_ispif *ispif_res;
+	//const struct resources *vfe_res;
 	unsigned int i;
 	int ret;
 
+#if 0
 	if (camss->version == CAMSS_8x16) {
-		csiphy_res = csiphy_res_8x16;
-		csid_res = csid_res_8x16;
-		ispif_res = &ispif_res_8x16;
-		vfe_res = vfe_res_8x16;
+		csiphy_res = csiphy_res;
+		csid_res = csid_res;
+		ispif_res = &ispif_res;
+		vfe_res = vfe_res;
 	} else if (camss->version == CAMSS_8x96) {
 		csiphy_res = csiphy_res_8x96;
 		csid_res = csid_res_8x96;
@@ -537,6 +646,7 @@ static int camss_init_subdevices(struct camss *camss)
 	} else {
 		return -EINVAL;
 	}
+#endif
 
 	for (i = 0; i < camss->csiphy_num; i++) {
 		ret = msm_csiphy_subdev_init(camss, &camss->csiphy[i],
@@ -560,7 +670,7 @@ static int camss_init_subdevices(struct camss *camss)
 		}
 	}
 
-	ret = msm_ispif_subdev_init(&camss->ispif, ispif_res);
+	ret = msm_ispif_subdev_init(&camss->ispif, &ispif_res);
 	if (ret < 0) {
 		dev_err(camss->dev, "Failed to init ispif sub-device: %d\n",
 			ret);
@@ -825,9 +935,9 @@ static int camss_probe(struct platform_device *pdev)
 
 	if (of_device_is_compatible(dev->of_node, "qcom,msm8916-camss")) {
 		camss->version = CAMSS_8x16;
-		camss->csiphy_num = 2;
-		camss->csid_num = 2;
-		camss->vfe_num = 1;
+		camss->csiphy_num = 3;
+		camss->csid_num = 4;
+		camss->vfe_num = 2;
 	} else if (of_device_is_compatible(dev->of_node,
 					   "qcom,msm8996-camss")) {
 		camss->version = CAMSS_8x96;

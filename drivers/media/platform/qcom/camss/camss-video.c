@@ -13,7 +13,7 @@
 #include <media/v4l2-device.h>
 #include <media/v4l2-ioctl.h>
 #include <media/v4l2-mc.h>
-#include <media/videobuf2-dma-sg.h>
+#include <media/videobuf2-dma-contig.h>
 
 #include "camss-video.h"
 #include "camss.h"
@@ -357,11 +357,11 @@ static int video_buf_init(struct vb2_buffer *vb)
 	unsigned int i;
 
 	for (i = 0; i < format->num_planes; i++) {
-		sgt = vb2_dma_sg_plane_desc(vb, i);
-		if (!sgt)
-			return -EFAULT;
+		//sgt = vb2_dma_sg_plane_desc(vb, i);
+		//if (!sgt)
+		//	return -EFAULT;
 
-		buffer->addr[i] = sg_dma_address(sgt->sgl);
+		buffer->addr[i] = vb2_dma_contig_plane_dma_addr(vb, i); //sg_dma_address(sgt->sgl);
 	}
 
 	if (format->pixelformat == V4L2_PIX_FMT_NV12 ||
@@ -860,7 +860,7 @@ int msm_video_register(struct camss_video *video, struct v4l2_device *v4l2_dev,
 
 	q = &video->vb2_q;
 	q->drv_priv = video;
-	q->mem_ops = &vb2_dma_sg_memops;
+	q->mem_ops = &vb2_dma_contig_memops;
 	q->ops = &msm_video_vb2_q_ops;
 	q->type = V4L2_BUF_TYPE_VIDEO_CAPTURE_MPLANE;
 	q->io_modes = VB2_DMABUF | VB2_MMAP | VB2_READ;

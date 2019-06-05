@@ -39,21 +39,19 @@
 #define to_device_index(ptr_module, index)	\
 	(to_camss_index(ptr_module, index)->dev)
 
-#define CAMSS_RES_MAX 17
-
 struct resources {
-	char *regulator[CAMSS_RES_MAX];
-	char *clock[CAMSS_RES_MAX];
-	u32 clock_rate[CAMSS_RES_MAX][CAMSS_RES_MAX];
-	char *reg[CAMSS_RES_MAX];
-	char *interrupt[CAMSS_RES_MAX];
+	const char *const *regulator;
+	const char *const *clock;
+	const u32 *const *clock_rate;
+	const char *const *reg;
+	const char *const *interrupt;
 };
 
 struct resources_ispif {
-	char *clock[CAMSS_RES_MAX];
-	char *clock_for_reset[CAMSS_RES_MAX];
-	char *reg[CAMSS_RES_MAX];
-	char *interrupt;
+	const char *const *clock;
+	const char *const *clock_for_reset;
+	const char *const *reg;
+	const char *interrupt;
 };
 
 enum pm_domain {
