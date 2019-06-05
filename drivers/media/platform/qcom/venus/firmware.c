@@ -24,14 +24,60 @@
 #include <linux/qcom_scm.h>
 #include <linux/sizes.h>
 #include <linux/soc/qcom/mdt_loader.h>
+#include <linux/dma-mapping.h>
 
 #include "core.h"
 #include "firmware.h"
 #include "hfi_venus_io.h"
 
 #define VENUS_PAS_ID			9
-#define VENUS_FW_MEM_SIZE		(6 * SZ_1M)
+#define VENUS_FW_MEM_SIZE		(5 * SZ_1M)
 #define VENUS_FW_START_ADDR		0x0
+
+static int qcom_iommu_sec_ptbl_init(struct device *dev)
+{
+	size_t psize = 0;
+	unsigned int spare = 0;
+	void *cpu_addr;
+	dma_addr_t paddr;
+	unsigned long attrs;
+	static bool allocated = false;
+	int ret;
+
+	if (allocated)
+		return 0;
+
+	ret = qcom_scm_iommu_secure_ptbl_size(spare, &psize);
+	if (ret) {
+		dev_err(dev, "failed to get iommu secure pgtable size (%d)\n",
+			ret);
+		return ret;
+	}
+
+	dev_info(dev, "iommu sec: pgtable size: %zu\n", psize);
+
+	attrs = DMA_ATTR_NO_KERNEL_MAPPING;
+
+	cpu_addr = dma_alloc_attrs(dev, psize, &paddr, GFP_KERNEL, attrs);
+	if (!cpu_addr) {
+		dev_err(dev, "failed to allocate %zu bytes for pgtable\n",
+			psize);
+		return -ENOMEM;
+	}
+
+	ret = qcom_scm_iommu_secure_ptbl_init(paddr, psize, spare);
+	if (ret) {
+		dev_err(dev, "failed to init iommu pgtable (%d)\n", ret);
+		goto free_mem;
+	}
+
+	allocated = true;
+	return 0;
+
+free_mem:
+	dma_free_attrs(dev, psize, cpu_addr, paddr, attrs);
+	return ret;
+}
 
 static void venus_reset_cpu(struct venus_core *core)
 {
@@ -190,6 +236,10 @@ int venus_boot(struct venus_core *core)
 	if (!IS_ENABLED(CONFIG_QCOM_MDT_LOADER) ||
 	    (core->use_tz && !qcom_scm_is_available()))
 		return -EPROBE_DEFER;
+
+	qcom_iommu_sec_ptbl_init(dev);
+	int test = qcom_scm_restore_sec_cfg(0, 0);
+	printk("qcom_scm_restore_sec_cfg %i\n", test);
 
 	ret = venus_load_fw(core, core->res->fwname, &mem_phys, &mem_size);
 	if (ret) {
