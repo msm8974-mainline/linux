@@ -94,16 +94,12 @@ static void
 parse_profile_level(struct venus_core *core, u32 codecs, u32 domain, void *data)
 {
 	struct hfi_profile_level_supported *pl = data;
-	struct hfi_profile_level *proflevel = pl->profile_level;
-	struct hfi_profile_level pl_arr[HFI_MAX_PROFILE_COUNT] = {};
 
 	if (pl->profile_count > HFI_MAX_PROFILE_COUNT)
 		return;
 
-	memcpy(pl_arr, proflevel, pl->profile_count * sizeof(*proflevel));
-
 	for_each_codec(core->caps, ARRAY_SIZE(core->caps), codecs, domain,
-		       fill_profile_level, pl_arr, pl->profile_count);
+		       fill_profile_level, pl->profile_level, pl->profile_count);
 }
 
 static void
@@ -119,17 +115,12 @@ static void
 parse_caps(struct venus_core *core, u32 codecs, u32 domain, void *data)
 {
 	struct hfi_capabilities *caps = data;
-	struct hfi_capability *cap = caps->data;
-	u32 num_caps = caps->num_capabilities;
-	struct hfi_capability caps_arr[MAX_CAP_ENTRIES] = {};
 
-	if (num_caps > MAX_CAP_ENTRIES)
+	if (caps->num_capabilities > MAX_CAP_ENTRIES)
 		return;
 
-	memcpy(caps_arr, cap, num_caps * sizeof(*cap));
-
 	for_each_codec(core->caps, ARRAY_SIZE(core->caps), codecs, domain,
-		       fill_caps, caps_arr, num_caps);
+		       fill_caps, caps->data, caps->num_capabilities);
 }
 
 static void fill_raw_fmts(struct venus_caps *cap, const void *fmts,
