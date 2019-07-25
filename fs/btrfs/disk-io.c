@@ -408,6 +408,14 @@ int btrfs_verify_level_key(struct extent_buffer *eb, int level,
 
 	if (!first_key)
 		return 0;
+	/* We have @first_key, so this @eb must have at least one item */
+	if (btrfs_header_nritems(eb) == 0) {
+		btrfs_err(fs_info,
+		"invalid tree nritems, bytenr=%llu nritems=0 expect >0",
+			  eb->start);
+		WARN_ON(IS_ENABLED(CONFIG_BTRFS_DEBUG));
+		return -EUCLEAN;
+	}
 
 	/*
 	 * For live tree block (new tree blocks in current transaction),
