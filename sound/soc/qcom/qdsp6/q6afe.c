@@ -43,6 +43,8 @@
 #define AFE_PARAM_ID_TDM_CONFIG	0x0001029D
 #define AFE_PARAM_ID_PORT_SLOT_MAPPING_CONFIG	0x00010297
 
+#define AFE_PARAM_ID_PSEUDO_PORT_CONFIG	0x00010219
+
 /* I2S config specific */
 #define AFE_API_VERSION_I2S_CONFIG	0x1
 #define AFE_PORT_I2S_SD0		0x1
@@ -116,6 +118,9 @@
 #define AFE_PORT_ID_TERTIARY_MI2S_TX        0x1005
 #define AFE_PORT_ID_QUATERNARY_MI2S_RX      0x1006
 #define AFE_PORT_ID_QUATERNARY_MI2S_TX      0x1007
+
+#define AFE_PORT_ID_VOICE_RECORD_RX	0x8003
+#define AFE_PORT_ID_VOICE_RECORD_TX	0x8004
 
 /* Start of the range of port IDs for TDM devices. */
 #define AFE_PORT_ID_TDM_PORT_RANGE_START	0x9000
@@ -448,11 +453,21 @@ struct afe_param_id_tdm_cfg {
 	u32	slot_mask;
 } __packed;
 
+struct afe_param_id_pseudo_port_cfg {
+	u32                  pseud_port_cfg_minor_version;
+	u16                  bit_width;
+	u16                  num_channels;
+	u16                  data_format;
+	u16                  timing_mode;
+	u32                  sample_rate;
+} __packed;
+
 union afe_port_config {
 	struct afe_param_id_hdmi_multi_chan_audio_cfg hdmi_multi_ch;
 	struct afe_param_id_slimbus_cfg           slim_cfg;
 	struct afe_param_id_i2s_cfg	i2s_cfg;
 	struct afe_param_id_tdm_cfg	tdm_cfg;
+	struct afe_param_id_pseudo_port_cfg pseudo_cfg;
 } __packed;
 
 
@@ -707,6 +722,10 @@ static struct afe_port_map port_maps[AFE_PORT_MAX] = {
 				QUINARY_TDM_TX_7, 0, 1},
 	[DISPLAY_PORT_RX] = { AFE_PORT_ID_HDMI_OVER_DP_RX,
 				DISPLAY_PORT_RX, 1, 1},
+	[VOICE_RECORD_RX] = { AFE_PORT_ID_VOICE_RECORD_RX,
+				VOICE_RECORD_RX, 0, 1},
+	[VOICE_RECORD_TX] = { AFE_PORT_ID_VOICE_RECORD_TX,
+				VOICE_RECORD_TX, 0, 1},
 };
 
 static void q6afe_port_free(struct kref *ref)
@@ -1289,6 +1308,28 @@ int q6afe_i2s_port_prepare(struct q6afe_port *port, struct q6afe_i2s_cfg *cfg)
 EXPORT_SYMBOL_GPL(q6afe_i2s_port_prepare);
 
 /**
+ * q6afe_pseudo_port_prepare() - Prepare slim afe port.
+ *
+ * @port: Instance of afe port
+ * @cfg: SLIM configuration for the afe port
+ *
+ */
+void q6afe_pseudo_port_prepare(struct q6afe_port *port,
+			     struct q6afe_pseudo_cfg *cfg)
+{
+	union afe_port_config *pcfg = &port->port_cfg;
+
+	pcfg->pseudo_cfg.pseud_port_cfg_minor_version = 1;//AFE_API_VERSION_PSEUDO_PORT_CONFIG;
+	pcfg->pseudo_cfg.num_channels = cfg->num_channels;
+	pcfg->pseudo_cfg.bit_width = 16;
+	pcfg->pseudo_cfg.data_format = 0;
+	pcfg->pseudo_cfg.timing_mode = 1;//AFE_PSEUDOPORT_TIMING_MODE_TIMER;
+	pcfg->pseudo_cfg.sample_rate = cfg->sample_rate;
+
+}
+EXPORT_SYMBOL_GPL(q6afe_pseudo_port_prepare);
+
+/**
  * q6afe_port_start() - Start a afe port
  *
  * @port: Instance of port to start
@@ -1304,6 +1345,25 @@ int q6afe_port_start(struct q6afe_port *port)
 	struct apr_pkt *pkt;
 	int pkt_size;
 	void *p;
+
+	if (param_id == AFE_PARAM_ID_SLIMBUS_CONFIG) {
+	printk("start cfg %d %d %d %d / %d %d %d %d\n",
+		port->port_cfg.slim_cfg.sample_rate,
+		port->port_cfg.slim_cfg.bit_width,
+		port->port_cfg.slim_cfg.num_channels,
+		port->port_cfg.slim_cfg.data_format,
+		port->port_cfg.slim_cfg.shared_ch_mapping[0],
+		port->port_cfg.slim_cfg.shared_ch_mapping[1],
+		port->port_cfg.slim_cfg.shared_ch_mapping[2],
+		port->port_cfg.slim_cfg.shared_ch_mapping[3]);
+
+	port->port_cfg.slim_cfg.shared_ch_mapping[0] = 144;
+	port->port_cfg.slim_cfg.shared_ch_mapping[1] = 145;
+	} else {
+	printk("start id %d %d %d\n", param_id,
+		port->port_cfg.pseudo_cfg.num_channels,
+		port->port_cfg.pseudo_cfg.sample_rate);
+	}
 
 	ret  = q6afe_port_set_param_v2(port, &port->port_cfg, param_id,
 				       AFE_MODULE_AUDIO_DEV_INTERFACE,
@@ -1419,6 +1479,11 @@ struct q6afe_port *q6afe_port_get_from_id(struct device *dev, int id)
 		break;
 	case AFE_PORT_ID_PRIMARY_TDM_RX ... AFE_PORT_ID_QUINARY_TDM_TX_7:
 		cfg_type = AFE_PARAM_ID_TDM_CONFIG;
+		break;
+
+	case AFE_PORT_ID_VOICE_RECORD_RX:
+	case AFE_PORT_ID_VOICE_RECORD_TX:
+		cfg_type = AFE_PARAM_ID_PSEUDO_PORT_CONFIG;
 		break;
 
 	default:

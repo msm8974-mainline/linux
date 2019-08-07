@@ -7,9 +7,20 @@
 
 #include "internal.h"
 
+int no_write;
+
 static int regmap_slimbus_write(void *context, const void *data, size_t count)
 {
 	struct slim_device *sdev = context;
+
+	printk("regmap_slimbus_write%d %.3X = %.2X\n", count-2, *(u16 *)data, ((u8 *)data + 2)[0]);
+	if (no_write && *(u16 *)data == 0xB0F)
+		return 0;
+
+	if (*(u16 *)data == 0x9ab && ((u8 *)data + 2)[0] == 0xb0) {
+		printk("begin nowrite\n");
+		no_write = 1;
+	}
 
 	return slim_write(sdev, *(u16 *)data, count - 2, (u8 *)data + 2);
 }

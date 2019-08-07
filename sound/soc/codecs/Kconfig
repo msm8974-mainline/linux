@@ -1159,6 +1159,17 @@ config SND_SOC_UDA1380
         tristate
 	depends on I2C
 
+config SND_SOC_WCD9320
+	tristate "WCD9320 Codec"
+	depends on SLIMBUS
+	select REGMAP_SLIMBUS
+	select REGMAP_IRQ
+	help
+	  The WCD9320 is a standalone Hi-Fi audio CODEC IC, supports
+	  Qualcomm Technologies, Inc. (QTI) multimedia solutions,
+	  including the MSM8974 chipset.
+
+
 config SND_SOC_WCD9335
 	tristate "WCD9335 Codec"
 	depends on SLIMBUS

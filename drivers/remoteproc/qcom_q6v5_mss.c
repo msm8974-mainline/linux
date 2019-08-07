@@ -1492,6 +1492,7 @@ static int q6v5_probe(struct platform_device *pdev)
 		goto detach_proxy_pds;
 	}
 
+	rproc->auto_boot = false;
 	ret = rproc_add(rproc);
 	if (ret)
 		goto detach_proxy_pds;

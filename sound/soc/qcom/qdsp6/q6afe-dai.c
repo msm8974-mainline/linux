@@ -81,6 +81,7 @@ static int q6slim_hw_params(struct snd_pcm_substream *substream,
 	struct q6afe_slim_cfg *slim = &dai_data->port_config[dai->id].slim;
 
 	slim->sample_rate = params_rate(params);
+	slim->num_channels = params_channels(params);
 
 	switch (params_format(params)) {
 	case SNDRV_PCM_FORMAT_S16_LE:
@@ -98,6 +99,20 @@ static int q6slim_hw_params(struct snd_pcm_substream *substream,
 			__func__, params_format(params));
 		return -EINVAL;
 	}
+
+	return 0;
+}
+
+static int q6incall_hw_params(struct snd_pcm_substream *substream,
+			    struct snd_pcm_hw_params *params,
+			    struct snd_soc_dai *dai)
+{
+
+	struct q6afe_dai_data *dai_data = dev_get_drvdata(dai->dev);
+	struct q6afe_pseudo_cfg *pseudo = &dai_data->port_config[dai->id].pseudo;
+
+	pseudo->sample_rate = params_rate(params);
+	pseudo->num_channels = params_channels(params);
 
 	return 0;
 }
@@ -362,6 +377,11 @@ static int q6afe_dai_prepare(struct snd_pcm_substream *substream,
 		q6afe_tdm_port_prepare(dai_data->port[dai->id],
 					&dai_data->port_config[dai->id].tdm);
 		break;
+	case VOICE_RECORD_RX:
+	case VOICE_RECORD_TX:
+		q6afe_pseudo_port_prepare(dai_data->port[dai->id],
+					&dai_data->port_config[dai->id].pseudo);
+		break;
 	default:
 		return -EINVAL;
 	}
@@ -447,6 +467,7 @@ static int q6afe_mi2s_set_sysclk(struct snd_soc_dai *dai,
 static const struct snd_soc_dapm_route q6afe_dapm_routes[] = {
 	{"HDMI Playback", NULL, "HDMI_RX"},
 	{"Display Port Playback", NULL, "DISPLAY_PORT_RX"},
+	{"Slimbus Playback", NULL, "SLIMBUS_0_RX"},
 	{"Slimbus1 Playback", NULL, "SLIMBUS_1_RX"},
 	{"Slimbus2 Playback", NULL, "SLIMBUS_2_RX"},
 	{"Slimbus3 Playback", NULL, "SLIMBUS_3_RX"},
@@ -455,6 +476,10 @@ static const struct snd_soc_dapm_route q6afe_dapm_routes[] = {
 	{"Slimbus6 Playback", NULL, "SLIMBUS_6_RX"},
 
 	{"SLIMBUS_0_TX", NULL, "Slimbus Capture"},
+
+	{"VOICE_RECORD_TX", NULL, "Voice Record TX"},
+	{"VOICE_RECORD_RX", NULL, "Voice Record RX"},
+
 	{"SLIMBUS_1_TX", NULL, "Slimbus1 Capture"},
 	{"SLIMBUS_2_TX", NULL, "Slimbus2 Capture"},
 	{"SLIMBUS_3_TX", NULL, "Slimbus3 Capture"},
@@ -584,6 +609,12 @@ static const struct snd_soc_dai_ops q6slim_ops = {
 	.set_channel_map = q6slim_set_channel_map,
 };
 
+static const struct snd_soc_dai_ops q6incall_ops = {
+	.prepare	= q6afe_dai_prepare,
+	.hw_params	= q6incall_hw_params,
+	.shutdown	= q6afe_dai_shutdown,
+};
+
 static const struct snd_soc_dai_ops q6tdm_ops = {
 	.prepare	= q6afe_dai_prepare,
 	.shutdown	= q6afe_dai_shutdown,
@@ -672,6 +703,38 @@ static struct snd_soc_dai_driver q6afe_dais[] = {
 			.channels_max = 8,
 			.rate_min = 8000,
 			.rate_max = 192000,
+		},
+	}, {
+		.name = "VOICE_RECORD_RX",
+		.ops = &q6incall_ops,
+		.id = VOICE_RECORD_RX,
+		.probe = msm_dai_q6_dai_probe,
+		.remove = msm_dai_q6_dai_remove,
+		.capture = {
+			.stream_name = "Voice Record RX",
+			.rates = SNDRV_PCM_RATE_48000 | SNDRV_PCM_RATE_8000 |
+				 SNDRV_PCM_RATE_16000,
+			.formats = SNDRV_PCM_FMTBIT_S16_LE,
+			.channels_min = 1,
+			.channels_max = 2,
+			.rate_min = 8000,
+			.rate_max = 48000,
+		},
+	}, {
+		.name = "VOICE_RECORD_TX",
+		.ops = &q6incall_ops,
+		.id = VOICE_RECORD_TX,
+		.probe = msm_dai_q6_dai_probe,
+		.remove = msm_dai_q6_dai_remove,
+		.capture = {
+			.stream_name = "Voice Record TX",
+			.rates = SNDRV_PCM_RATE_48000 | SNDRV_PCM_RATE_8000 |
+				 SNDRV_PCM_RATE_16000,
+			.formats = SNDRV_PCM_FMTBIT_S16_LE,
+			.channels_min = 1,
+			.channels_max = 2,
+			.rate_min = 8000,
+			.rate_max = 48000,
 		},
 	}, {
 		.playback = {
@@ -1142,6 +1205,10 @@ static const struct snd_soc_dapm_widget q6afe_dai_widgets[] = {
 	SND_SOC_DAPM_AIF_IN("SLIMBUS_5_RX", NULL, 0, 0, 0, 0),
 	SND_SOC_DAPM_AIF_IN("SLIMBUS_6_RX", NULL, 0, 0, 0, 0),
 	SND_SOC_DAPM_AIF_OUT("SLIMBUS_0_TX", NULL, 0, 0, 0, 0),
+
+	SND_SOC_DAPM_AIF_OUT("VOICE_RECORD_TX", NULL, 0, 0, 0, 0),
+	SND_SOC_DAPM_AIF_OUT("VOICE_RECORD_RX", NULL, 0, 0, 0, 0),
+
 	SND_SOC_DAPM_AIF_OUT("SLIMBUS_1_TX", NULL, 0, 0, 0, 0),
 	SND_SOC_DAPM_AIF_OUT("SLIMBUS_2_TX", NULL, 0, 0, 0, 0),
 	SND_SOC_DAPM_AIF_OUT("SLIMBUS_3_TX", NULL, 0, 0, 0, 0),

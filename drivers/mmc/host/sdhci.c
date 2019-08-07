@@ -3111,7 +3111,7 @@ cont:
 			continue;
 
 		if (sdhci_defer_done(host, mrq)) {
-			result = IRQ_WAKE_THREAD;
+			queue_work(host->complete_wq, &host->complete_work);
 		} else {
 			mrqs_done[i] = mrq;
 			host->mrqs_done[i] = NULL;

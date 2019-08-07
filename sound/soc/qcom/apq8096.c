@@ -74,11 +74,8 @@ static int apq8096_init(struct snd_soc_pcm_runtime *rtd)
 	 * TX1, TX2, TX3, TX4, TX5, TX6, TX7, TX8, TX9, TX10, TX11, TX12, TX13
 	 * TX14, TX15, TX16
 	 */
-	unsigned int rx_ch[SLIM_MAX_RX_PORTS] = {144, 145, 146, 147, 148, 149,
-					150, 151, 152, 153, 154, 155, 156};
-	unsigned int tx_ch[SLIM_MAX_TX_PORTS] = {128, 129, 130, 131, 132, 133,
-					    134, 135, 136, 137, 138, 139,
-					    140, 141, 142, 143};
+	unsigned int rx_ch[] = {144, 145};
+	unsigned int tx_ch[] = {};
 
 	snd_soc_dai_set_channel_map(codec_dai, ARRAY_SIZE(tx_ch),
 					tx_ch, ARRAY_SIZE(rx_ch), rx_ch);
@@ -122,9 +119,12 @@ static int apq8096_platform_probe(struct platform_device *pdev)
 	}
 
 	apq8096_add_be_ops(card);
+	card->name = "mycard";
 	ret = snd_soc_register_card(card);
-	if (ret)
+	if (ret) {
+		printk("snd_soc_register_card failed\n");
 		goto err_card_register;
+	}
 
 	return 0;
 

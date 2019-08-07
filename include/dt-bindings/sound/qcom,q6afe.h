@@ -107,6 +107,9 @@
 #define QUINARY_TDM_RX_7	102
 #define QUINARY_TDM_TX_7	103
 #define DISPLAY_PORT_RX		104
+#define VOICE_RECORD_RX		105
+#define VOICE_RECORD_TX		106
+#define AFE_PORT_MAX 107
 
 #endif /* __DT_BINDINGS_Q6_AFE_H__ */
 
