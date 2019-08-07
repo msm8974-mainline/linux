@@ -498,6 +498,17 @@
 
 &spmi_bus {
 	pm8941@0 {
+		charger@1000 {
+			qcom,fast-charge-safe-current = <1500000>; // confirmed
+			qcom,fast-charge-current-limit = <1500000>; // confirmed
+			//qcom,dc-current-limit = <>; // 1800000 is used on other msm8974 devices
+			qcom,fast-charge-safe-voltage = <4380000>; // confirmed
+			qcom,fast-charge-high-threshold-voltage = <4350000>; // confirmed
+			//qcom,fast-charge-low-threshold-voltage = <>; // not present downstream
+			qcom,auto-recharge-threshold-voltage = <4250000>; // confirmed
+			qcom,minimum-input-voltage = <4450000>; // confirmed
+		};
+
 		gpios@c000 {
 			gpio_keys_pin_a: gpio-keys-active {
 				pins = "gpio1", "gpio2", "gpio5";
