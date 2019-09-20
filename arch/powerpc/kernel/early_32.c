@@ -22,7 +22,8 @@ notrace unsigned long __init early_init(unsigned long dt_ptr)
 	unsigned long offset = reloc_offset();
 
 	/* First zero the BSS */
-	memset(PTRRELOC(&__bss_start), 0, __bss_stop - __bss_start);
+	if (kernstart_virt_addr == KERNELBASE)
+		memset(PTRRELOC(&__bss_start), 0, __bss_stop - __bss_start);
 
 	/*
 	 * Identify the CPU type and fix up code sections
@@ -32,5 +33,5 @@ notrace unsigned long __init early_init(unsigned long dt_ptr)
 
 	apply_feature_fixups();
 
-	return KERNELBASE + offset;
+	return kernstart_virt_addr + offset;
 }
