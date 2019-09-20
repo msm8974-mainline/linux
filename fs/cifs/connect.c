@@ -5176,7 +5176,7 @@ int
 cifs_negotiate_protocol(const unsigned int xid, struct cifs_ses *ses)
 {
 	int rc = 0;
-	struct TCP_Server_Info *server = ses->server;
+	struct TCP_Server_Info *server = cifs_ses_server(ses);
 
 	if (!server->ops->need_neg || !server->ops->negotiate)
 		return -ENOSYS;
@@ -5203,7 +5203,7 @@ cifs_setup_session(const unsigned int xid, struct cifs_ses *ses,
 		   struct nls_table *nls_info)
 {
 	int rc = -ENOSYS;
-	struct TCP_Server_Info *server = ses->server;
+	struct TCP_Server_Info *server = cifs_ses_server(ses);
 
 	ses->capabilities = server->capabilities;
 	if (linuxExtEnabled == 0)
