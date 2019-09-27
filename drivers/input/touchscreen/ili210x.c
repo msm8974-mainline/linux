@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0-only
+#define DEBUG
 #include <linux/module.h>
 #include <linux/i2c.h>
 #include <linux/interrupt.h>
@@ -13,6 +14,7 @@
 #include <asm/unaligned.h>
 
 #define ILI210X_TOUCHES		2
+#define ILI212X_TOUCHES		10
 #define ILI251X_TOUCHES		10
 #define DEFAULT_POLL_PERIOD	20
 
@@ -20,6 +22,7 @@
 #define REG_TOUCHDATA		0x10
 #define REG_PANEL_INFO		0x20
 #define REG_FIRMWARE_VERSION	0x40
+#define REG_FIRMWARE_VERSION_ILI212X	0x21
 #define REG_CALIBRATE		0xcc
 
 struct firmware_version {
@@ -30,6 +33,7 @@ struct firmware_version {
 
 enum ili2xxx_model {
 	MODEL_ILI210X,
+	MODEL_ILI212X,
 	MODEL_ILI251X,
 };
 
@@ -118,6 +122,23 @@ static bool ili210x_touchdata_to_coords(struct ili210x *priv, u8 *touchdata,
 	return true;
 }
 
+static bool ili212x_touchdata_to_coords(struct ili210x *priv, u8 *touchdata,
+					unsigned int finger,
+					unsigned int *x, unsigned int *y)
+{
+	if (finger >= ILI212X_TOUCHES)
+		return false;
+
+	*x = get_unaligned_be16(touchdata + 3 + (finger * 5) + 0);
+	if (!(*x & BIT(15)))	/* Touch indication */
+		return false;
+
+	*x &= 0x3fff;
+	*y = get_unaligned_be16(touchdata + 3 + (finger * 5) + 2);
+
+	return true;
+}
+
 static bool ili251x_touchdata_to_coords(struct ili210x *priv, u8 *touchdata,
 					unsigned int finger,
 					unsigned int *x, unsigned int *y)
@@ -146,6 +167,12 @@ static bool ili210x_report_events(struct ili210x *priv, u8 *touchdata)
 		if (priv->model == MODEL_ILI210X) {
 			touch = ili210x_touchdata_to_coords(priv, touchdata,
 							    i, &x, &y);
+		} else if (priv->model == MODEL_ILI212X) {
+			touch = ili212x_touchdata_to_coords(priv, touchdata,
+							    i, &x, &y);
+
+			if (touch)
+				contact = true;
 		} else if (priv->model == MODEL_ILI251X) {
 			touch = ili251x_touchdata_to_coords(priv, touchdata,
 							    i, &x, &y);
@@ -179,7 +206,8 @@ static void ili210x_work(struct work_struct *work)
 	bool touch;
 	int error = -EINVAL;
 
-	if (priv->model == MODEL_ILI210X) {
+	if (priv->model == MODEL_ILI210X ||
+	    priv->model == MODEL_ILI212X) {
 		error = ili210x_read_reg(client, REG_TOUCHDATA,
 					 touchdata, sizeof(touchdata));
 	} else if (priv->model == MODEL_ILI251X) {
@@ -195,6 +223,10 @@ static void ili210x_work(struct work_struct *work)
 		return;
 	}
 
+#ifdef DEBUG
+//	print_hex_dump(KERN_DEBUG, "mem: ", DUMP_PREFIX_OFFSET,
+//		       16, 1, touchdata, sizeof(touchdata), false);
+#endif
 	touch = ili210x_report_events(priv, touchdata);
 
 	if (touch)
@@ -311,14 +343,20 @@ static int ili210x_i2c_probe(struct i2c_client *client,
 	priv->model = model;
 	if (model == MODEL_ILI210X)
 		priv->max_touches = ILI210X_TOUCHES;
-	if (model == MODEL_ILI251X)
+	else if (model == MODEL_ILI212X)
+		priv->max_touches = ILI212X_TOUCHES;
+	else if (model == MODEL_ILI251X)
 		priv->max_touches = ILI251X_TOUCHES;
 
 	i2c_set_clientdata(client, priv);
 
 	/* Get firmware version */
-	error = ili210x_read_reg(client, REG_FIRMWARE_VERSION,
-				 &firmware, sizeof(firmware));
+	if (model == MODEL_ILI212X)
+		error = ili210x_read_reg(client, REG_FIRMWARE_VERSION_ILI212X,
+					 &firmware, sizeof(firmware));
+	else
+		error = ili210x_read_reg(client, REG_FIRMWARE_VERSION,
+					 &firmware, sizeof(firmware));
 	if (error) {
 		dev_err(dev, "Failed to get firmware version, err: %d\n",
 			error);
@@ -395,6 +433,7 @@ static SIMPLE_DEV_PM_OPS(ili210x_i2c_pm,
 
 static const struct i2c_device_id ili210x_i2c_id[] = {
 	{ "ili210x", MODEL_ILI210X },
+	{ "ili212x", MODEL_ILI212X },
 	{ "ili251x", MODEL_ILI251X },
 	{ }
 };
@@ -402,6 +441,7 @@ MODULE_DEVICE_TABLE(i2c, ili210x_i2c_id);
 
 static const struct of_device_id ili210x_dt_ids[] = {
 	{ .compatible = "ilitek,ili210x", .data = (void *)MODEL_ILI210X },
+	{ .compatible = "ilitek,ili212x", .data = (void *)MODEL_ILI212X },
 	{ .compatible = "ilitek,ili251x", .data = (void *)MODEL_ILI251X },
 	{ },
 };
