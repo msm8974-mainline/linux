@@ -279,6 +279,16 @@
 	};
 
 	pinctrl@fd510000 {
+		i2c2_pins: i2c2 {
+			mux {
+				pins = "gpio6", "gpio7";
+				function = "blsp_i2c2";
+
+				drive-strength = <2>;
+				bias-disable;
+			};
+		};
+
 		sdhc1_pin_a: sdhc1-pin-active {
 			clk {
 				pins = "sdc1_clk";
@@ -367,6 +377,27 @@
 
 		pinctrl-names = "default";
 		pinctrl-0 = <&sdhc2_pin_a>;
+	};
+
+	i2c@f9924000 {
+		status = "ok";
+
+		clock-frequency = <384000>;
+		qcom,src-freq = <19200000>;
+
+		pinctrl-names = "default";
+		pinctrl-0 = <&i2c2_pins>;
+
+		ilitek2120@41 {
+			compatible = "ilitek,ili212x";
+			reg = <0x41>;
+			interrupt-parent = <&msmgpio>;
+			interrupts = <28 IRQ_TYPE_EDGE_FALLING>;
+			reset-gpios = <&msmgpio 55 GPIO_ACTIVE_LOW>;
+
+			touchscreen-size-x = <1080>;
+			touchscreen-size-y = <1920>;
+		};
 	};
 
 	usb@f9a55000 {
