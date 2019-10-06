@@ -14,6 +14,7 @@
 #include <linux/of.h>
 #include <linux/platform_device.h>
 #include <linux/soc/qcom/smd-rpm.h>
+#include <linux/delay.h>
 
 #include <dt-bindings/clock/qcom,rpmcc.h>
 
@@ -1274,6 +1275,9 @@ static int rpm_smd_clk_probe(struct platform_device *pdev)
 
 	rpm_smd_clks = desc->clks;
 	num_clks = desc->num_clks;
+
+	/* delay rpm init, somehow this fixes some problems */
+	usleep_range(200000, 210000);
 
 	if (desc->scaling_before_handover) {
 		ret = clk_smd_rpm_enable_scaling();
