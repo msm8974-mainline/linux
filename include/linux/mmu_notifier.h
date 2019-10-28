@@ -6,10 +6,12 @@
 #include <linux/spinlock.h>
 #include <linux/mm_types.h>
 #include <linux/srcu.h>
+#include <linux/interval_tree.h>
 
 struct mmu_notifier_mm;
 struct mmu_notifier;
 struct mmu_notifier_range;
+struct mmu_range_notifier;
 
 /**
  * enum mmu_notifier_event - reason for the mmu notifier callback
@@ -32,6 +34,9 @@ struct mmu_notifier_range;
  * access flags). User should soft dirty the page in the end callback to make
  * sure that anyone relying on soft dirtyness catch pages that might be written
  * through non CPU mappings.
+ *
+ * @MMU_NOTIFY_RELEASE: used during mmu_range_notifier invalidate to signal that
+ * the mm refcount is zero and the range is no longer accessible.
  */
 enum mmu_notifier_event {
 	MMU_NOTIFY_UNMAP = 0,
@@ -39,6 +44,7 @@ enum mmu_notifier_event {
 	MMU_NOTIFY_PROTECTION_VMA,
 	MMU_NOTIFY_PROTECTION_PAGE,
 	MMU_NOTIFY_SOFT_DIRTY,
+	MMU_NOTIFY_RELEASE,
 };
 
 #define MMU_NOTIFIER_RANGE_BLOCKABLE (1 << 0)
@@ -222,6 +228,26 @@ struct mmu_notifier {
 	unsigned int users;
 };
 
+/**
+ * struct mmu_range_notifier_ops
+ * @invalidate: Upon return the caller must stop using any SPTEs within this
+ *              range, this function can sleep. Return false if blocking was
+ *              required but range is non-blocking
+ */
+struct mmu_range_notifier_ops {
+	bool (*invalidate)(struct mmu_range_notifier *mrn,
+			   const struct mmu_notifier_range *range,
+			   unsigned long cur_seq);
+};
+
+struct mmu_range_notifier {
+	struct interval_tree_node interval_tree;
+	const struct mmu_range_notifier_ops *ops;
+	struct hlist_node deferred_item;
+	unsigned long invalidate_seq;
+	struct mm_struct *mm;
+};
+
 #ifdef CONFIG_MMU_NOTIFIER
 
 #ifdef CONFIG_LOCKDEP
@@ -263,6 +289,78 @@ extern int __mmu_notifier_register(struct mmu_notifier *mn,
 				   struct mm_struct *mm);
 extern void mmu_notifier_unregister(struct mmu_notifier *mn,
 				    struct mm_struct *mm);
+
+unsigned long mmu_range_read_begin(struct mmu_range_notifier *mrn);
+int mmu_range_notifier_insert(struct mmu_range_notifier *mrn,
+			      unsigned long start, unsigned long length,
+			      struct mm_struct *mm);
+int mmu_range_notifier_insert_locked(struct mmu_range_notifier *mrn,
+				     unsigned long start, unsigned long length,
+				     struct mm_struct *mm);
+void mmu_range_notifier_remove(struct mmu_range_notifier *mrn);
+
+/**
+ * mmu_range_set_seq - Save the invalidation sequence
+ * @mrn - The mrn passed to invalidate
+ * @cur_seq - The cur_seq passed to invalidate
+ *
+ * This must be called unconditionally from the invalidate callback of a
+ * struct mmu_range_notifier_ops under the same lock that is used to call
+ * mmu_range_read_retry(). It updates the sequence number for later use by
+ * mmu_range_read_retry().
+ *
+ * If the user does not call mmu_range_read_begin() or mmu_range_read_retry()
+ * then this call is not required.
+ */
+static inline void mmu_range_set_seq(struct mmu_range_notifier *mrn,
+				     unsigned long cur_seq)
+{
+	WRITE_ONCE(mrn->invalidate_seq, cur_seq);
+}
+
+/**
+ * mmu_range_read_retry - End a read side critical section against a VA range
+ * mrn: The range under lock
+ * seq: The return of the paired mmu_range_read_begin()
+ *
+ * This MUST be called under a user provided lock that is also held
+ * unconditionally by op->invalidate() when it calls mmu_range_set_seq().
+ *
+ * Each call should be paired with a single mmu_range_read_begin() and
+ * should be used to conclude the read side.
+ *
+ * Returns true if an invalidation collided with this critical section, and
+ * the caller should retry.
+ */
+static inline bool mmu_range_read_retry(struct mmu_range_notifier *mrn,
+					unsigned long seq)
+{
+	return mrn->invalidate_seq != seq;
+}
+
+/**
+ * mmu_range_check_retry - Test if a collision has occurred
+ * mrn: The range under lock
+ * seq: The return of the matching mmu_range_read_begin()
+ *
+ * This can be used in the critical section between mmu_range_read_begin() and
+ * mmu_range_read_retry().  A return of true indicates an invalidation has
+ * collided with this lock and a future mmu_range_read_retry() will return
+ * true.
+ *
+ * False is not reliable and only suggests a collision has not happened. It
+ * can be called many times and does not have to hold the user provided lock.
+ *
+ * This call can be used as part of loops and other expensive operations to
+ * expedite a retry.
+ */
+static inline bool mmu_range_check_retry(struct mmu_range_notifier *mrn,
+					 unsigned long seq)
+{
+	/* Pairs with the WRITE_ONCE in mmu_range_set_seq() */
+	return READ_ONCE(mrn->invalidate_seq) != seq;
+}
+
 extern void __mmu_notifier_mm_destroy(struct mm_struct *mm);
 extern void __mmu_notifier_release(struct mm_struct *mm);
 extern int __mmu_notifier_clear_flush_young(struct mm_struct *mm,
