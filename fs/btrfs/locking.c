@@ -195,6 +195,7 @@ static void btrfs_assert_tree_write_locks_put(struct extent_buffer *eb) { }
  */
 void btrfs_set_lock_blocking_read(struct extent_buffer *eb)
 {
+	lockdep_assert_held(&eb->lock);
 	trace_btrfs_set_lock_blocking_read(eb);
 	/*
 	 * No lock is required.  The lock owner may change if we have a read
@@ -219,6 +220,7 @@ void btrfs_set_lock_blocking_read(struct extent_buffer *eb)
  */
 void btrfs_set_lock_blocking_write(struct extent_buffer *eb)
 {
+	lockdep_assert_held_write(&eb->lock);
 	trace_btrfs_set_lock_blocking_write(eb);
 	/*
 	 * No lock is required.  The lock owner may change if we have a read
@@ -358,6 +360,7 @@ int btrfs_try_tree_write_lock(struct extent_buffer *eb)
  */
 void btrfs_tree_read_unlock(struct extent_buffer *eb)
 {
+	lockdep_assert_held(&eb->lock);
 	trace_btrfs_tree_read_unlock(eb);
 	/*
 	 * if we're nested, we have the write lock.  No new locking
