@@ -778,7 +778,19 @@ static struct platform_driver msm8974_noc_driver = {
 		.of_match_table = msm8974_noc_of_match,
 	},
 };
-module_platform_driver(msm8974_noc_driver);
+
+static int __init msm8974_noc_driver_init(void)
+{
+	return platform_driver_register(&msm8974_noc_driver);
+}
+core_initcall(msm8974_noc_driver_init);
+
+static void __exit msm8974_noc_driver_exit(void)
+{
+	platform_driver_unregister(&msm8974_noc_driver);
+}
+module_exit(msm8974_noc_driver_exit);
+
 MODULE_DESCRIPTION("Qualcomm MSM8974 NoC driver");
 MODULE_AUTHOR("Brian Masney <masneyb@onstation.org>");
 MODULE_LICENSE("GPL v2");
