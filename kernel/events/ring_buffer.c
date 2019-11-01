@@ -754,6 +754,14 @@ static void *perf_mmap_alloc_page(int cpu)
 	return page_address(page);
 }
 
+static void perf_mmap_free_page(void *addr)
+{
+	struct page *page = virt_to_page(addr);
+
+	page->mapping = NULL;
+	__free_page(page);
+}
+
 struct ring_buffer *rb_alloc(int nr_pages, long watermark, int cpu, int flags)
 {
 	struct ring_buffer *rb;
@@ -788,9 +796,9 @@ struct ring_buffer *rb_alloc(int nr_pages, long watermark, int cpu, int flags)
 
 fail_data_pages:
 	for (i--; i >= 0; i--)
-		free_page((unsigned long)rb->data_pages[i]);
+		perf_mmap_free_page(rb->data_pages[i]);
 
-	free_page((unsigned long)rb->user_page);
+	perf_mmap_free_page(rb->user_page);
 
 fail_user_page:
 	kfree(rb);
@@ -799,21 +807,13 @@ fail:
 	return NULL;
 }
 
-static void perf_mmap_free_page(unsigned long addr)
-{
-	struct page *page = virt_to_page((void *)addr);
-
-	page->mapping = NULL;
-	__free_page(page);
-}
-
 void rb_free(struct ring_buffer *rb)
 {
 	int i;
 
-	perf_mmap_free_page((unsigned long)rb->user_page);
+	perf_mmap_free_page(rb->user_page);
 	for (i = 0; i < rb->nr_pages; i++)
-		perf_mmap_free_page((unsigned long)rb->data_pages[i]);
+		perf_mmap_free_page(rb->data_pages[i]);
 	kfree(rb);
 }
 
