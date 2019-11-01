@@ -465,11 +465,11 @@ static int fsi_master_aspeed_probe(struct platform_device *pdev)
 	writel(fsi_base, aspeed->base + OPB_FSI_BASE);
 
 	/* Set read data order */
-	writel(0x0011bb1b, aspeed->base + OPB0_R_ENDIAN);
+	writel(0x00030b1b, aspeed->base + OPB0_R_ENDIAN);
 
 	/* Set write data order */
-	writel(0x0011bb1b, aspeed->base + OPB0_W_ENDIAN);
-	writel(0xffaa5500, aspeed->base + 0x50);
+	writel(0x0011101b, aspeed->base + OPB0_W_ENDIAN);
+	writel(0x0c330f3f, aspeed->base + 0x50);
 
 	/*
 	 * Select OPB0 for all operations.
