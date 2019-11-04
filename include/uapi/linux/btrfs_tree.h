@@ -300,7 +300,12 @@
 #define BTRFS_CSUM_SIZE 32
 
 /* csum types */
-#define BTRFS_CSUM_TYPE_CRC32	0
+enum btrfs_csum_type {
+	BTRFS_CSUM_TYPE_CRC32	= 0,
+	BTRFS_CSUM_TYPE_XXHASH	= 1,
+	BTRFS_CSUM_TYPE_SHA256	= 2,
+	BTRFS_CSUM_TYPE_BLAKE2	= 3,
+};
 
 /*
  * flags definitions for directory entry item type
@@ -735,10 +740,12 @@ struct btrfs_balance_item {
 	__le64 unused[4];
 } __attribute__ ((__packed__));
 
-#define BTRFS_FILE_EXTENT_INLINE 0
-#define BTRFS_FILE_EXTENT_REG 1
-#define BTRFS_FILE_EXTENT_PREALLOC 2
-#define BTRFS_FILE_EXTENT_TYPES	2
+enum {
+	BTRFS_FILE_EXTENT_INLINE   = 0,
+	BTRFS_FILE_EXTENT_REG      = 1,
+	BTRFS_FILE_EXTENT_PREALLOC = 2,
+	BTRFS_NR_FILE_EXTENT_TYPES = 3,
+};
 
 struct btrfs_file_extent_item {
 	/*
@@ -806,11 +813,6 @@ struct btrfs_dev_stats_item {
 
 #define BTRFS_DEV_REPLACE_ITEM_CONT_READING_FROM_SRCDEV_MODE_ALWAYS	0
 #define BTRFS_DEV_REPLACE_ITEM_CONT_READING_FROM_SRCDEV_MODE_AVOID	1
-#define BTRFS_DEV_REPLACE_ITEM_STATE_NEVER_STARTED	0
-#define BTRFS_DEV_REPLACE_ITEM_STATE_STARTED		1
-#define BTRFS_DEV_REPLACE_ITEM_STATE_SUSPENDED		2
-#define BTRFS_DEV_REPLACE_ITEM_STATE_FINISHED		3
-#define BTRFS_DEV_REPLACE_ITEM_STATE_CANCELED		4
 
 struct btrfs_dev_replace_item {
 	/*
