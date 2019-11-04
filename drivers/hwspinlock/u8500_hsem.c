@@ -88,7 +88,6 @@ static int u8500_hsem_probe(struct platform_device *pdev)
 	struct hwspinlock_pdata *pdata = pdev->dev.platform_data;
 	struct hwspinlock_device *bank;
 	struct hwspinlock *hwlock;
-	struct resource *res;
 	void __iomem *io_base;
 	int i, ret, num_locks = U8500_MAX_SEMAPHORE;
 	ulong val;
@@ -96,13 +95,9 @@ static int u8500_hsem_probe(struct platform_device *pdev)
 	if (!pdata)
 		return -ENODEV;
 
-	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-	if (!res)
-		return -ENODEV;
-
-	io_base = ioremap(res->start, resource_size(res));
-	if (!io_base)
-		return -ENOMEM;
+	io_base = devm_platform_ioremap_resource(pdev, 0);
+	if (IS_ERR(io_base))
+		return PTR_ERR(io_base);
 
 	/* make sure protocol 1 is selected */
 	val = readl(io_base + HSEM_CTRL_REG);
@@ -111,11 +106,10 @@ static int u8500_hsem_probe(struct platform_device *pdev)
 	/* clear all interrupts */
 	writel(0xFFFF, io_base + HSEM_ICRALL);
 
-	bank = kzalloc(struct_size(bank, lock, num_locks), GFP_KERNEL);
-	if (!bank) {
-		ret = -ENOMEM;
-		goto iounmap_base;
-	}
+	bank = devm_kzalloc(&pdev->dev, struct_size(bank, lock, num_locks),
+			    GFP_KERNEL);
+	if (!bank)
+		return -ENOMEM;
 
 	platform_set_drvdata(pdev, bank);
 
@@ -125,39 +119,25 @@ static int u8500_hsem_probe(struct platform_device *pdev)
 	/* no pm needed for HSem but required to comply with hwspilock core */
 	pm_runtime_enable(&pdev->dev);
 
-	ret = hwspin_lock_register(bank, &pdev->dev, &u8500_hwspinlock_ops,
-						pdata->base_id, num_locks);
-	if (ret)
-		goto reg_fail;
+	ret = devm_hwspin_lock_register(&pdev->dev, bank, &u8500_hwspinlock_ops,
+					pdata->base_id, num_locks);
+	if (ret) {
+		pm_runtime_disable(&pdev->dev);
+		return ret;
+	}
 
 	return 0;
-
-reg_fail:
-	pm_runtime_disable(&pdev->dev);
-	kfree(bank);
-iounmap_base:
-	iounmap(io_base);
-	return ret;
 }
 
 static int u8500_hsem_remove(struct platform_device *pdev)
 {
 	struct hwspinlock_device *bank = platform_get_drvdata(pdev);
 	void __iomem *io_base = bank->lock[0].priv - HSEM_REGISTER_OFFSET;
-	int ret;
 
 	/* clear all interrupts */
 	writel(0xFFFF, io_base + HSEM_ICRALL);
 
-	ret = hwspin_lock_unregister(bank);
-	if (ret) {
-		dev_err(&pdev->dev, "%s failed: %d\n", __func__, ret);
-		return ret;
-	}
-
 	pm_runtime_disable(&pdev->dev);
-	iounmap(io_base);
-	kfree(bank);
 
 	return 0;
 }
