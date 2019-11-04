@@ -71,9 +71,9 @@ software_node_to_swnode(const struct software_node *node)
 	return swnode;
 }
 
-const struct software_node *to_software_node(struct fwnode_handle *fwnode)
+const struct software_node *to_software_node(const struct fwnode_handle *fwnode)
 {
-	struct swnode *swnode = to_swnode(fwnode);
+	const struct swnode *swnode = to_swnode(fwnode);
 
 	return swnode ? swnode->node : NULL;
 }
@@ -515,12 +515,47 @@ static int software_node_read_string_array(const struct fwnode_handle *fwnode,
 						propname, val, nval);
 }
 
+static const char *
+software_node_get_name(const struct fwnode_handle *fwnode)
+{
+	const struct swnode *swnode = to_swnode(fwnode);
+
+	if (!swnode)
+		return "(null)";
+
+	return kobject_name(&swnode->kobj);
+}
+
+static const char *
+software_node_get_name_prefix(const struct fwnode_handle *fwnode)
+{
+	struct fwnode_handle *parent;
+	const char *prefix;
+
+	parent = fwnode_get_parent(fwnode);
+	if (!parent)
+		return "";
+
+	/* Figure out the prefix from the parents. */
+	while (is_software_node(parent))
+		parent = fwnode_get_next_parent(parent);
+
+	prefix = fwnode_get_name_prefix(parent);
+	fwnode_handle_put(parent);
+
+	/* Guess something if prefix was NULL. */
+	return prefix ?: "/";
+}
+
 static struct fwnode_handle *
 software_node_get_parent(const struct fwnode_handle *fwnode)
 {
 	struct swnode *swnode = to_swnode(fwnode);
 
-	return swnode ? (swnode->parent ? &swnode->parent->fwnode : NULL) : NULL;
+	if (!swnode || !swnode->parent)
+		return NULL;
+
+	return fwnode_handle_get(&swnode->parent->fwnode);
 }
 
 static struct fwnode_handle *
@@ -612,6 +647,8 @@ static const struct fwnode_operations software_node_ops = {
 	.property_present = software_node_property_present,
 	.property_read_int_array = software_node_read_int_array,
 	.property_read_string_array = software_node_read_string_array,
+	.get_name = software_node_get_name,
+	.get_name_prefix = software_node_get_name_prefix,
 	.get_parent = software_node_get_parent,
 	.get_next_child_node = software_node_get_next_child,
 	.get_named_child_node = software_node_get_named_child_node,
