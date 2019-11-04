@@ -14,62 +14,57 @@
 #include "locking.h"
 
 #ifdef CONFIG_BTRFS_DEBUG
-static void btrfs_assert_spinning_writers_get(struct extent_buffer *eb)
+static inline void btrfs_assert_spinning_writers_get(struct extent_buffer *eb)
 {
 	WARN_ON(eb->spinning_writers);
 	eb->spinning_writers++;
 }
 
-static void btrfs_assert_spinning_writers_put(struct extent_buffer *eb)
+static inline void btrfs_assert_spinning_writers_put(struct extent_buffer *eb)
 {
 	WARN_ON(eb->spinning_writers != 1);
 	eb->spinning_writers--;
 }
 
-static void btrfs_assert_no_spinning_writers(struct extent_buffer *eb)
+static inline void btrfs_assert_no_spinning_writers(struct extent_buffer *eb)
 {
 	WARN_ON(eb->spinning_writers);
 }
 
-static void btrfs_assert_spinning_readers_get(struct extent_buffer *eb)
+static inline void btrfs_assert_spinning_readers_get(struct extent_buffer *eb)
 {
 	atomic_inc(&eb->spinning_readers);
 }
 
-static void btrfs_assert_spinning_readers_put(struct extent_buffer *eb)
+static inline void btrfs_assert_spinning_readers_put(struct extent_buffer *eb)
 {
 	WARN_ON(atomic_read(&eb->spinning_readers) == 0);
 	atomic_dec(&eb->spinning_readers);
 }
 
-static void btrfs_assert_tree_read_locks_get(struct extent_buffer *eb)
+static inline void btrfs_assert_tree_read_locks_get(struct extent_buffer *eb)
 {
 	atomic_inc(&eb->read_locks);
 }
 
-static void btrfs_assert_tree_read_locks_put(struct extent_buffer *eb)
+static inline void btrfs_assert_tree_read_locks_put(struct extent_buffer *eb)
 {
 	atomic_dec(&eb->read_locks);
 }
 
-static void btrfs_assert_tree_read_locked(struct extent_buffer *eb)
+static inline void btrfs_assert_tree_read_locked(struct extent_buffer *eb)
 {
 	BUG_ON(!atomic_read(&eb->read_locks));
 }
 
-static void btrfs_assert_tree_write_locks_get(struct extent_buffer *eb)
+static inline void btrfs_assert_tree_write_locks_get(struct extent_buffer *eb)
 {
 	eb->write_locks++;
 }
 
-static void btrfs_assert_tree_write_locks_put(struct extent_buffer *eb)
+static inline void btrfs_assert_tree_write_locks_put(struct extent_buffer *eb)
 {
 	eb->write_locks--;
-}
-
-void btrfs_assert_tree_locked(struct extent_buffer *eb)
-{
-	BUG_ON(!eb->write_locks);
 }
 
 #else
@@ -81,7 +76,6 @@ static void btrfs_assert_spinning_readers_get(struct extent_buffer *eb) { }
 static void btrfs_assert_tree_read_locked(struct extent_buffer *eb) { }
 static void btrfs_assert_tree_read_locks_get(struct extent_buffer *eb) { }
 static void btrfs_assert_tree_read_locks_put(struct extent_buffer *eb) { }
-void btrfs_assert_tree_locked(struct extent_buffer *eb) { }
 static void btrfs_assert_tree_write_locks_get(struct extent_buffer *eb) { }
 static void btrfs_assert_tree_write_locks_put(struct extent_buffer *eb) { }
 #endif
@@ -320,5 +314,57 @@ void btrfs_tree_unlock(struct extent_buffer *eb)
 	} else {
 		btrfs_assert_spinning_writers_put(eb);
 		write_unlock(&eb->lock);
+	}
+}
+
+/*
+ * Set all locked nodes in the path to blocking locks.  This should be done
+ * before scheduling
+ */
+void btrfs_set_path_blocking(struct btrfs_path *p)
+{
+	int i;
+
+	for (i = 0; i < BTRFS_MAX_LEVEL; i++) {
+		if (!p->nodes[i] || !p->locks[i])
+			continue;
+		/*
+		 * If we currently have a spinning reader or writer lock this
+		 * will bump the count of blocking holders and drop the
+		 * spinlock.
+		 */
+		if (p->locks[i] == BTRFS_READ_LOCK) {
+			btrfs_set_lock_blocking_read(p->nodes[i]);
+			p->locks[i] = BTRFS_READ_LOCK_BLOCKING;
+		} else if (p->locks[i] == BTRFS_WRITE_LOCK) {
+			btrfs_set_lock_blocking_write(p->nodes[i]);
+			p->locks[i] = BTRFS_WRITE_LOCK_BLOCKING;
+		}
+	}
+}
+
+/*
+ * This releases any locks held in the path starting at level and going all the
+ * way up to the root.
+ *
+ * btrfs_search_slot will keep the lock held on higher nodes in a few corner
+ * cases, such as COW of the block at slot zero in the node.  This ignores
+ * those rules, and it should only be called when there are no more updates to
+ * be done higher up in the tree.
+ */
+void btrfs_unlock_up_safe(struct btrfs_path *path, int level)
+{
+	int i;
+
+	if (path->keep_locks)
+		return;
+
+	for (i = level; i < BTRFS_MAX_LEVEL; i++) {
+		if (!path->nodes[i])
+			continue;
+		if (!path->locks[i])
+			continue;
+		btrfs_tree_unlock_rw(path->nodes[i], path->locks[i]);
+		path->locks[i] = 0;
 	}
 }

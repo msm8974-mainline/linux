@@ -75,8 +75,8 @@ void btrfs_free_excluded_extents(struct btrfs_block_group_cache *cache)
 	struct btrfs_fs_info *fs_info = cache->fs_info;
 	u64 start, end;
 
-	start = cache->key.objectid;
-	end = start + cache->key.offset - 1;
+	start = cache->start;
+	end = start + cache->length - 1;
 
 	clear_extent_bits(&fs_info->freed_extents[0],
 			  start, end, EXTENT_UPTODATE);
@@ -1306,8 +1306,10 @@ static int btrfs_issue_discard(struct block_device *bdev, u64 start, u64 len,
 int btrfs_discard_extent(struct btrfs_fs_info *fs_info, u64 bytenr,
 			 u64 num_bytes, u64 *actual_bytes)
 {
-	int ret;
+	int ret = 0;
 	u64 discarded_bytes = 0;
+	u64 end = bytenr + num_bytes;
+	u64 cur = bytenr;
 	struct btrfs_bio *bbio = NULL;
 
 
@@ -1316,15 +1318,23 @@ int btrfs_discard_extent(struct btrfs_fs_info *fs_info, u64 bytenr,
 	 * associated to its stripes that don't go away while we are discarding.
 	 */
 	btrfs_bio_counter_inc_blocked(fs_info);
-	/* Tell the block device(s) that the sectors can be discarded */
-	ret = btrfs_map_block(fs_info, BTRFS_MAP_DISCARD, bytenr, &num_bytes,
-			      &bbio, 0);
-	/* Error condition is -ENOMEM */
-	if (!ret) {
-		struct btrfs_bio_stripe *stripe = bbio->stripes;
+	while (cur < end) {
+		struct btrfs_bio_stripe *stripe;
 		int i;
 
+		num_bytes = end - cur;
+		/* Tell the block device(s) that the sectors can be discarded */
+		ret = btrfs_map_block(fs_info, BTRFS_MAP_DISCARD, cur,
+				      &num_bytes, &bbio, 0);
+		/*
+		 * Error can be -ENOMEM, -ENOENT (no such chunk mapping) or
+		 * -EOPNOTSUPP. For any such error, @num_bytes is not updated,
+		 * thus we can't continue anyway.
+		 */
+		if (ret < 0)
+			goto out;
 
+		stripe = bbio->stripes;
 		for (i = 0; i < bbio->num_stripes; i++, stripe++) {
 			u64 bytes;
 			struct request_queue *req_q;
@@ -1341,10 +1351,19 @@ int btrfs_discard_extent(struct btrfs_fs_info *fs_info, u64 bytenr,
 						  stripe->physical,
 						  stripe->length,
 						  &bytes);
-			if (!ret)
+			if (!ret) {
 				discarded_bytes += bytes;
-			else if (ret != -EOPNOTSUPP)
-				break; /* Logic errors or -ENOMEM, or -EIO but I don't know how that could happen JDM */
+			} else if (ret != -EOPNOTSUPP) {
+				/*
+				 * Logic errors or -ENOMEM, or -EIO, but
+				 * unlikely to happen.
+				 *
+				 * And since there are two loops, explicitly
+				 * go to out to avoid confusion.
+				 */
+				btrfs_put_bbio(bbio);
+				goto out;
+			}
 
 			/*
 			 * Just in case we get back EOPNOTSUPP for some reason,
@@ -1354,7 +1373,9 @@ int btrfs_discard_extent(struct btrfs_fs_info *fs_info, u64 bytenr,
 			ret = 0;
 		}
 		btrfs_put_bbio(bbio);
+		cur += num_bytes;
 	}
+out:
 	btrfs_bio_counter_dec(fs_info);
 
 	if (actual_bytes)
@@ -2560,7 +2581,7 @@ static u64 first_logical_byte(struct btrfs_fs_info *fs_info, u64 search_start)
 	if (!cache)
 		return 0;
 
-	bytenr = cache->key.objectid;
+	bytenr = cache->start;
 	btrfs_put_block_group(cache);
 
 	return bytenr;
@@ -2590,13 +2611,12 @@ static int pin_down_extent(struct btrfs_block_group_cache *cache,
 	return 0;
 }
 
-/*
- * this function must be called within transaction
- */
 int btrfs_pin_extent(struct btrfs_fs_info *fs_info,
 		     u64 bytenr, u64 num_bytes, int reserved)
 {
 	struct btrfs_block_group_cache *cache;
+
+	ASSERT(fs_info->running_transaction);
 
 	cache = btrfs_lookup_block_group(fs_info, bytenr);
 	BUG_ON(!cache); /* Logic error */
@@ -2797,7 +2817,7 @@ static int unpin_extent_range(struct btrfs_fs_info *fs_info,
 	while (start <= end) {
 		readonly = false;
 		if (!cache ||
-		    start >= cache->key.objectid + cache->key.offset) {
+		    start >= cache->start + cache->length) {
 			if (cache)
 				btrfs_put_block_group(cache);
 			total_unpinned = 0;
@@ -2810,7 +2830,7 @@ static int unpin_extent_range(struct btrfs_fs_info *fs_info,
 			empty_cluster <<= 1;
 		}
 
-		len = cache->key.objectid + cache->key.offset - start;
+		len = cache->start + cache->length - start;
 		len = min(len, end + 1 - start);
 
 		if (start < cache->last_byte_to_unpin) {
@@ -2926,8 +2946,8 @@ int btrfs_finish_extent_commit(struct btrfs_trans_handle *trans)
 		ret = -EROFS;
 		if (!trans->aborted)
 			ret = btrfs_discard_extent(fs_info,
-						   block_group->key.objectid,
-						   block_group->key.offset,
+						   block_group->start,
+						   block_group->length,
 						   &trimmed);
 
 		list_del_init(&block_group->bg_list);
@@ -3493,7 +3513,7 @@ static int find_free_extent_clustered(struct btrfs_block_group_cache *bg,
 		goto release_cluster;
 
 	offset = btrfs_alloc_from_cluster(cluster_bg, last_ptr,
-			ffe_ctl->num_bytes, cluster_bg->key.objectid,
+			ffe_ctl->num_bytes, cluster_bg->start,
 			&ffe_ctl->max_extent_size);
 	if (offset) {
 		/* We have a block, we're done */
@@ -3904,7 +3924,7 @@ search:
 			continue;
 
 		btrfs_grab_block_group(block_group, delalloc);
-		ffe_ctl.search_start = block_group->key.objectid;
+		ffe_ctl.search_start = block_group->start;
 
 		/*
 		 * this can happen if we end up cycling through all the
@@ -3984,7 +4004,7 @@ checks:
 
 		/* move on to the next group */
 		if (ffe_ctl.search_start + num_bytes >
-		    block_group->key.objectid + block_group->key.offset) {
+		    block_group->start + block_group->length) {
 			btrfs_add_free_space(block_group, ffe_ctl.found_offset,
 					     num_bytes);
 			goto loop;
@@ -5436,7 +5456,7 @@ int btrfs_drop_subtree(struct btrfs_trans_handle *trans,
 
 	btrfs_assert_tree_locked(parent);
 	parent_level = btrfs_header_level(parent);
-	extent_buffer_get(parent);
+	atomic_inc(&parent->refs);
 	path->nodes[parent_level] = parent;
 	path->slots[parent_level] = btrfs_header_nritems(parent);
 
@@ -5498,9 +5518,8 @@ u64 btrfs_account_ro_block_groups_free_space(struct btrfs_space_info *sinfo)
 		}
 
 		factor = btrfs_bg_type_to_factor(block_group->flags);
-		free_bytes += (block_group->key.offset -
-			       btrfs_block_group_used(&block_group->item)) *
-			       factor;
+		free_bytes += (block_group->length -
+			       block_group->used) * factor;
 
 		spin_unlock(&block_group->lock);
 	}
@@ -5647,13 +5666,13 @@ int btrfs_trim_fs(struct btrfs_fs_info *fs_info, struct fstrim_range *range)
 
 	cache = btrfs_lookup_first_block_group(fs_info, range->start);
 	for (; cache; cache = btrfs_next_block_group(cache)) {
-		if (cache->key.objectid >= range_end) {
+		if (cache->start >= range_end) {
 			btrfs_put_block_group(cache);
 			break;
 		}
 
-		start = max(range->start, cache->key.objectid);
-		end = min(range_end, cache->key.objectid + cache->key.offset);
+		start = max(range->start, cache->start);
+		end = min(range_end, cache->start + cache->length);
 
 		if (end - start >= range->minlen) {
 			if (!btrfs_block_group_cache_done(cache)) {

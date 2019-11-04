@@ -28,6 +28,7 @@
 #include <linux/dynamic_debug.h>
 #include <linux/refcount.h>
 #include <linux/crc32c.h>
+#include "extent-io-tree.h"
 #include "extent_io.h"
 #include "extent_map.h"
 #include "async-thread.h"
@@ -722,7 +723,6 @@ struct btrfs_fs_info {
 	struct btrfs_workqueue *endio_meta_write_workers;
 	struct btrfs_workqueue *endio_write_workers;
 	struct btrfs_workqueue *endio_freespace_worker;
-	struct btrfs_workqueue *submit_workers;
 	struct btrfs_workqueue *caching_workers;
 	struct btrfs_workqueue *readahead_workers;
 
@@ -1519,18 +1519,18 @@ static inline u64 btrfs_stripe_devid_nr(struct extent_buffer *eb,
 }
 
 /* struct btrfs_block_group_item */
-BTRFS_SETGET_STACK_FUNCS(block_group_used, struct btrfs_block_group_item,
+BTRFS_SETGET_STACK_FUNCS(stack_block_group_used, struct btrfs_block_group_item,
 			 used, 64);
-BTRFS_SETGET_FUNCS(disk_block_group_used, struct btrfs_block_group_item,
+BTRFS_SETGET_FUNCS(block_group_used, struct btrfs_block_group_item,
 			 used, 64);
-BTRFS_SETGET_STACK_FUNCS(block_group_chunk_objectid,
+BTRFS_SETGET_STACK_FUNCS(stack_block_group_chunk_objectid,
 			struct btrfs_block_group_item, chunk_objectid, 64);
 
-BTRFS_SETGET_FUNCS(disk_block_group_chunk_objectid,
+BTRFS_SETGET_FUNCS(block_group_chunk_objectid,
 		   struct btrfs_block_group_item, chunk_objectid, 64);
-BTRFS_SETGET_FUNCS(disk_block_group_flags,
+BTRFS_SETGET_FUNCS(block_group_flags,
 		   struct btrfs_block_group_item, flags, 64);
-BTRFS_SETGET_STACK_FUNCS(block_group_flags,
+BTRFS_SETGET_STACK_FUNCS(stack_block_group_flags,
 			struct btrfs_block_group_item, flags, 64);
 
 /* struct btrfs_free_space_info */
@@ -2163,6 +2163,9 @@ BTRFS_SETGET_STACK_FUNCS(super_uuid_tree_generation, struct btrfs_super_block,
 
 int btrfs_super_csum_size(const struct btrfs_super_block *s);
 const char *btrfs_super_csum_name(u16 csum_type);
+const char *btrfs_super_csum_driver(u16 csum_type);
+size_t __const btrfs_get_num_csums(void);
+
 
 /*
  * The leaf data grows from end-to-front in the node.
@@ -2507,7 +2510,7 @@ void btrfs_wait_for_snapshot_creation(struct btrfs_root *root);
 /* ctree.c */
 int btrfs_bin_search(struct extent_buffer *eb, const struct btrfs_key *key,
 		     int level, int *slot);
-int btrfs_comp_cpu_keys(const struct btrfs_key *k1, const struct btrfs_key *k2);
+int __pure btrfs_comp_cpu_keys(const struct btrfs_key *k1, const struct btrfs_key *k2);
 int btrfs_previous_item(struct btrfs_root *root,
 			struct btrfs_path *path, u64 min_objectid,
 			int type);
@@ -2567,8 +2570,6 @@ int btrfs_realloc_node(struct btrfs_trans_handle *trans,
 void btrfs_release_path(struct btrfs_path *p);
 struct btrfs_path *btrfs_alloc_path(void);
 void btrfs_free_path(struct btrfs_path *p);
-void btrfs_set_path_blocking(struct btrfs_path *p);
-void btrfs_unlock_up_safe(struct btrfs_path *p, int level);
 
 int btrfs_del_items(struct btrfs_trans_handle *trans, struct btrfs_root *root,
 		   struct btrfs_path *path, int slot, int nr);
@@ -2870,10 +2871,9 @@ int btrfs_drop_inode(struct inode *inode);
 int __init btrfs_init_cachep(void);
 void __cold btrfs_destroy_cachep(void);
 struct inode *btrfs_iget_path(struct super_block *s, struct btrfs_key *location,
-			      struct btrfs_root *root, int *new,
-			      struct btrfs_path *path);
+			      struct btrfs_root *root, struct btrfs_path *path);
 struct inode *btrfs_iget(struct super_block *s, struct btrfs_key *location,
-			 struct btrfs_root *root, int *was_new);
+			 struct btrfs_root *root);
 struct extent_map *btrfs_get_extent(struct btrfs_inode *inode,
 				    struct page *page, size_t pg_offset,
 				    u64 start, u64 end, int create);
@@ -2909,7 +2909,7 @@ long btrfs_ioctl(struct file *file, unsigned int cmd, unsigned long arg);
 long btrfs_compat_ioctl(struct file *file, unsigned int cmd, unsigned long arg);
 int btrfs_ioctl_get_supported_features(void __user *arg);
 void btrfs_sync_inode_flags_to_i_flags(struct inode *inode);
-int btrfs_is_empty_uuid(u8 *uuid);
+int __pure btrfs_is_empty_uuid(u8 *uuid);
 int btrfs_defrag_file(struct inode *inode, struct file *file,
 		      struct btrfs_ioctl_defrag_range_args *range,
 		      u64 newer_than, unsigned long max_pages);
@@ -3143,7 +3143,7 @@ __cold
 void __btrfs_handle_fs_error(struct btrfs_fs_info *fs_info, const char *function,
 		     unsigned int line, int errno, const char *fmt, ...);
 
-const char *btrfs_decode_error(int errno);
+const char * __attribute_const__ btrfs_decode_error(int errno);
 
 __cold
 void __btrfs_abort_transaction(struct btrfs_trans_handle *trans,
