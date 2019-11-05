@@ -128,7 +128,8 @@ extern int SendReceiveBlockingLock(const unsigned int xid,
 			struct smb_hdr *out_buf,
 			int *bytes_returned);
 extern int cifs_reconnect(struct TCP_Server_Info *server);
-extern int checkSMB(char *buf, unsigned int len, struct TCP_Server_Info *srvr);
+extern int checkSMB(char *buf, unsigned int len, struct TCP_Server_Info *srvr,
+		    bool decrypted);
 extern bool is_valid_oplock_break(char *, struct TCP_Server_Info *);
 extern bool backup_cred(struct cifs_sb_info *);
 extern bool is_size_safe_to_change(struct cifsInodeInfo *, __u64 eof);

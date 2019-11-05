@@ -129,7 +129,8 @@ static __u32 get_neg_ctxt_len(struct smb2_sync_hdr *hdr, __u32 len,
 }
 
 int
-smb2_check_message(char *buf, unsigned int len, struct TCP_Server_Info *srvr)
+smb2_check_message(char *buf, unsigned int len, struct TCP_Server_Info *srvr,
+		   bool decrypted)
 {
 	struct smb2_sync_hdr *shdr = (struct smb2_sync_hdr *)buf;
 	struct smb2_sync_pdu *pdu = (struct smb2_sync_pdu *)shdr;
@@ -253,11 +254,20 @@ smb2_check_message(char *buf, unsigned int len, struct TCP_Server_Info *srvr)
 		 * If pad is longer than eight bytes, log the server behavior
 		 * (once), since may indicate a problem but allow it and continue
 		 * since the frame is parseable.
+		 * (once), since may indicate a problem but allow it and
+		 * continue since the frame is parseable.
+		 *
+		 * Do not log warning below if decrypted since for the encrypted
+		 * case len can include total of more than one SMB request
+		 * when part of a compounded req while clc_len will be smaller
+		 * since it is calculated for only one of the requests
 		 */
 		if (clc_len < len) {
-			pr_warn_once(
-			     "srv rsp padded more than expected. Length %d not %d for cmd:%d mid:%llu\n",
-			     len, clc_len, command, mid);
+			if (!decrypted)
+				pr_warn_once(
+				    "srv rsp padded more than expected. "
+				    "Length %d not %d for cmd:%d mid:%llu\n",
+				    len, clc_len, command, mid);
 			return 0;
 		}
 		pr_warn_once(
