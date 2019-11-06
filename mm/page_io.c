@@ -361,6 +361,11 @@ int swap_readpage(struct page *page, bool synchronous)
 	VM_BUG_ON_PAGE(!PageLocked(page), page);
 	VM_BUG_ON_PAGE(PageUptodate(page), page);
 
+	/*
+	 * Count submission time as memory stall. When the device is congested,
+	 * or the submitting cgroup IO-throttled, submission can be a
+	 * significant part of overall IO time.
+	 */
 	psi_memstall_enter(&pflags);
 
 	if (frontswap_load(page) == 0) {
