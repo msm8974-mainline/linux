@@ -184,7 +184,6 @@ static __always_inline ssize_t __mcopy_atomic_hugetlb(struct mm_struct *dst_mm,
 	unsigned long src_addr, dst_addr;
 	long copied;
 	struct page *page;
-	struct hstate *h;
 	unsigned long vma_hpagesize;
 	pgoff_t idx;
 	u32 hash;
@@ -255,8 +254,6 @@ retry:
 		if (unlikely(anon_vma_prepare(dst_vma)))
 			goto out_unlock;
 	}
-
-	h = hstate_vma(dst_vma);
 
 	while (src_addr < src_start + len) {
 		pte_t dst_pteval;
