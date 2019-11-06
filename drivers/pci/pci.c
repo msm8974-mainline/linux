@@ -887,7 +887,7 @@ static int pci_raw_set_power_state(struct pci_dev *dev, pci_power_t state)
 	if (state == PCI_D3hot || dev->current_state == PCI_D3hot)
 		pci_dev_d3_sleep(dev);
 	else if (state == PCI_D2 || dev->current_state == PCI_D2)
-		udelay(PCI_PM_D2_DELAY);
+		msleep(PCI_PM_D2_DELAY);
 
 	pci_read_config_word(dev, dev->pm_cap + PCI_PM_CTRL, &pmcsr);
 	dev->current_state = (pmcsr & PCI_PM_CTRL_STATE_MASK);
@@ -964,7 +964,7 @@ void pci_refresh_power_state(struct pci_dev *dev)
  * @dev: PCI device to handle.
  * @state: State to put the device into.
  */
-static int pci_platform_power_transition(struct pci_dev *dev, pci_power_t state)
+int pci_platform_power_transition(struct pci_dev *dev, pci_power_t state)
 {
 	int error;
 
@@ -980,6 +980,7 @@ static int pci_platform_power_transition(struct pci_dev *dev, pci_power_t state)
 
 	return error;
 }
+EXPORT_SYMBOL_GPL(pci_platform_power_transition);
 
 /**
  * pci_wakeup - Wake up a PCI device
@@ -1004,33 +1005,31 @@ void pci_wakeup_bus(struct pci_bus *bus)
 }
 
 /**
- * __pci_start_power_transition - Start power transition of a PCI device
- * @dev: PCI device to handle.
- * @state: State to put the device into.
+ * pci_power_up - Put the given device into D0
+ * @dev: PCI device to power up
  */
-static void __pci_start_power_transition(struct pci_dev *dev, pci_power_t state)
+int pci_power_up(struct pci_dev *dev)
 {
-	if (state == PCI_D0) {
-		pci_platform_power_transition(dev, PCI_D0);
+	pci_platform_power_transition(dev, PCI_D0);
+
+	/*
+	 * Mandatory power management transition delays, see PCI Express Base
+	 * Specification Revision 2.0 Section 6.6.1: Conventional Reset.  Do not
+	 * delay for devices powered on/off by corresponding bridge, because
+	 * have already delayed for the bridge.
+	 */
+	if (dev->runtime_d3cold) {
+		if (dev->d3cold_delay && !dev->imm_ready)
+			msleep(dev->d3cold_delay);
 		/*
-		 * Mandatory power management transition delays, see
-		 * PCI Express Base Specification Revision 2.0 Section
-		 * 6.6.1: Conventional Reset.  Do not delay for
-		 * devices powered on/off by corresponding bridge,
-		 * because have already delayed for the bridge.
+		 * When powering on a bridge from D3cold, the whole hierarchy
+		 * may be powered on into D0uninitialized state, resume them to
+		 * give them a chance to suspend again
 		 */
-		if (dev->runtime_d3cold) {
-			if (dev->d3cold_delay && !dev->imm_ready)
-				msleep(dev->d3cold_delay);
-			/*
-			 * When powering on a bridge from D3cold, the
-			 * whole hierarchy may be powered on into
-			 * D0uninitialized state, resume them to give
-			 * them a chance to suspend again
-			 */
-			pci_wakeup_bus(dev->subordinate);
-		}
+		pci_wakeup_bus(dev->subordinate);
 	}
+
+	return pci_raw_set_power_state(dev, PCI_D0);
 }
 
 /**
@@ -1056,27 +1055,6 @@ void pci_bus_set_current_state(struct pci_bus *bus, pci_power_t state)
 	if (bus)
 		pci_walk_bus(bus, __pci_dev_set_current_state, &state);
 }
-
-/**
- * __pci_complete_power_transition - Complete power transition of a PCI device
- * @dev: PCI device to handle.
- * @state: State to put the device into.
- *
- * This function should not be called directly by device drivers.
- */
-int __pci_complete_power_transition(struct pci_dev *dev, pci_power_t state)
-{
-	int ret;
-
-	if (state <= PCI_D0)
-		return -EINVAL;
-	ret = pci_platform_power_transition(dev, state);
-	/* Power off the bridge may power off the whole hierarchy */
-	if (!ret && state == PCI_D3cold)
-		pci_bus_set_current_state(dev->subordinate, PCI_D3cold);
-	return ret;
-}
-EXPORT_SYMBOL_GPL(__pci_complete_power_transition);
 
 /**
  * pci_set_power_state - Set the power state of a PCI device
@@ -1118,7 +1096,8 @@ int pci_set_power_state(struct pci_dev *dev, pci_power_t state)
 	if (dev->current_state == state)
 		return 0;
 
-	__pci_start_power_transition(dev, state);
+	if (state == PCI_D0)
+		return pci_power_up(dev);
 
 	/*
 	 * This device is quirked not to be put into D3, so don't put it in
@@ -1134,23 +1113,16 @@ int pci_set_power_state(struct pci_dev *dev, pci_power_t state)
 	error = pci_raw_set_power_state(dev, state > PCI_D3hot ?
 					PCI_D3hot : state);
 
-	if (!__pci_complete_power_transition(dev, state))
-		error = 0;
+	if (pci_platform_power_transition(dev, state))
+		return error;
 
-	return error;
+	/* Powering off a bridge may power off the whole hierarchy */
+	if (state == PCI_D3cold)
+		pci_bus_set_current_state(dev->subordinate, PCI_D3cold);
+
+	return 0;
 }
 EXPORT_SYMBOL(pci_set_power_state);
-
-/**
- * pci_power_up - Put the given device into D0 forcibly
- * @dev: PCI device to power up
- */
-void pci_power_up(struct pci_dev *dev)
-{
-	__pci_start_power_transition(dev, PCI_D0);
-	pci_raw_set_power_state(dev, PCI_D0);
-	pci_update_current_state(dev, PCI_D0);
-}
 
 /**
  * pci_choose_state - Choose the power state of a PCI device
@@ -4606,7 +4578,7 @@ static int pci_pm_reset(struct pci_dev *dev, int probe)
 	pci_write_config_word(dev, dev->pm_cap + PCI_PM_CTRL, csr);
 	pci_dev_d3_sleep(dev);
 
-	return pci_dev_wait(dev, "PM D3->D0", PCIE_RESET_READY_POLL_MS);
+	return pci_dev_wait(dev, "PM D3hot->D0", PCIE_RESET_READY_POLL_MS);
 }
 /**
  * pcie_wait_for_link - Wait until link is active or inactive
