@@ -2888,10 +2888,9 @@ static int claim_swapfile(struct swap_info_struct *p, struct inode *inode)
 		if (error < 0)
 			return error;
 		/*
-		 * Zoned block device contains zones that have
-		 * sequential write only restriction. For the restriction,
-		 * zoned block devices are not suitable for a swap device.
-		 * Disallow them here.
+		 * Zoned block devices contain zones that have a sequential
+		 * write only restriction.  Hence zoned block devices are not
+		 * suitable for swapping.  Disallow them here.
 		 */
 		if (blk_queue_is_zoned(p->bdev->bd_queue))
 			return -EINVAL;
