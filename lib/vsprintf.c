@@ -742,7 +742,6 @@ early_initcall(initialize_ptr_random);
 /* Maps a pointer to a 32 bit unique identifier. */
 int ptr_to_hashval(const void *ptr, unsigned long *hashval_out)
 {
-	const char *str = sizeof(ptr) == 8 ? "(____ptrval____)" : "(ptrval)";
 	unsigned long hashval;
 
 	if (static_branch_unlikely(&not_filled_random_ptr_key))
