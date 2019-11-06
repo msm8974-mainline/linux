@@ -33,6 +33,8 @@ static int external_module = 0;
 static int vmlinux_section_warnings = 1;
 /* Only warn about unresolved symbols */
 static int warn_unresolved = 0;
+/* Warn about symbols exported multiple times */
+static int warn_multiple_export = 1;
 /* How a symbol is exported */
 static int sec_mismatch_count = 0;
 static int sec_mismatch_fatal = 0;
@@ -382,7 +384,7 @@ static struct symbol *sym_add_exported(const char *name, struct module *mod,
 	if (!s) {
 		s = new_symbol(name, mod, export);
 	} else {
-		if (!s->preloaded) {
+		if (warn_multiple_export && !s->preloaded) {
 			warn("%s: '%s' exported twice. Previous export was in %s%s\n",
 			     mod->name, name, s->module->name,
 			     is_vmlinux(s->module->name) ? "" : ".ko");
@@ -2559,7 +2561,7 @@ int main(int argc, char **argv)
 	struct ext_sym_list *extsym_iter;
 	struct ext_sym_list *extsym_start = NULL;
 
-	while ((opt = getopt(argc, argv, "i:e:mnsT:o:awEd:")) != -1) {
+	while ((opt = getopt(argc, argv, "i:e:mnsT:o:awWEd:")) != -1) {
 		switch (opt) {
 		case 'i':
 			kernel_read = optarg;
@@ -2593,6 +2595,9 @@ int main(int argc, char **argv)
 			break;
 		case 'w':
 			warn_unresolved = 1;
+			break;
+		case 'W':
+			warn_multiple_export = 0;
 			break;
 		case 'E':
 			sec_mismatch_fatal = 1;

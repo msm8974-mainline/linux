@@ -223,6 +223,12 @@ KBUILD_SIGN_PIN
 This variable allows a passphrase or PIN to be passed to the sign-file
 utility when signing kernel modules, if the private key requires such.
 
+KBUILD_MULTI_EXPORT_NO_WARN
+---------------------------
+This variable can be set to suppress warnings about symbols exported
+multiple times. This is useful when you are building an external module
+to provide a different version of an in-tree module.
+
 KBUILD_MODPOST_WARN
 -------------------
 KBUILD_MODPOST_WARN can be set to avoid errors in case of undefined
