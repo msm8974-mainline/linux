@@ -18,13 +18,13 @@ static void pci_fixup_i450nx(struct pci_dev *d)
 	int pxb, reg;
 	u8 busno, suba, subb;
 
-	dev_warn(&d->dev, "Searching for i450NX host bridges\n");
+	pci_warn(d, "Searching for i450NX host bridges\n");
 	reg = 0xd0;
 	for(pxb = 0; pxb < 2; pxb++) {
 		pci_read_config_byte(d, reg++, &busno);
 		pci_read_config_byte(d, reg++, &suba);
 		pci_read_config_byte(d, reg++, &subb);
-		dev_dbg(&d->dev, "i450NX PXB %d: %02x/%02x/%02x\n", pxb, busno,
+		pci_dbg(d, "i450NX PXB %d: %02x/%02x/%02x\n", pxb, busno,
 			suba, subb);
 		if (busno)
 			pcibios_scan_root(busno);	/* Bus A */
@@ -43,7 +43,7 @@ static void pci_fixup_i450gx(struct pci_dev *d)
 	 */
 	u8 busno;
 	pci_read_config_byte(d, 0x4a, &busno);
-	dev_info(&d->dev, "i440KX/GX host bridge; secondary bus %02x\n", busno);
+	pci_info(d, "i440KX/GX host bridge; secondary bus %02x\n", busno);
 	pcibios_scan_root(busno);
 	pcibios_last_bus = -1;
 }
@@ -57,7 +57,7 @@ static void pci_fixup_umc_ide(struct pci_dev *d)
 	 */
 	int i;
 
-	dev_warn(&d->dev, "Fixing base address flags\n");
+	pci_warn(d, "Fixing base address flags\n");
 	for(i = 0; i < 4; i++)
 		d->resource[i].flags |= PCI_BASE_ADDRESS_SPACE_IO;
 }
@@ -69,7 +69,7 @@ static void pci_fixup_latency(struct pci_dev *d)
 	 *  SiS 5597 and 5598 chipsets require latency timer set to
 	 *  at most 32 to avoid lockups.
 	 */
-	dev_dbg(&d->dev, "Setting max latency to 32\n");
+	pci_dbg(d, "Setting max latency to 32\n");
 	pcibios_max_latency = 32;
 }
 DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_SI, PCI_DEVICE_ID_SI_5597, pci_fixup_latency);
@@ -127,7 +127,7 @@ static void pci_fixup_via_northbridge_bug(struct pci_dev *d)
 
 	pci_read_config_byte(d, where, &v);
 	if (v & ~mask) {
-		dev_warn(&d->dev, "Disabling VIA memory write queue (PCI ID %04x, rev %02x): [%02x] %02x & %02x -> %02x\n", \
+		pci_warn(d, "Disabling VIA memory write queue (PCI ID %04x, rev %02x): [%02x] %02x & %02x -> %02x\n", \
 			d->device, d->revision, where, v, mask, v & mask);
 		v &= mask;
 		pci_write_config_byte(d, where, v);
@@ -189,7 +189,7 @@ static void pci_fixup_nforce2(struct pci_dev *dev)
 	 * Apply fixup if needed, but don't touch disconnect state
 	 */
 	if ((val & 0x00FF0000) != 0x00010000) {
-		dev_warn(&dev->dev, "nForce2 C1 Halt Disconnect fixup\n");
+		pci_warn(dev, "nForce2 C1 Halt Disconnect fixup\n");
 		pci_write_config_dword(dev, 0x6c, (val & 0xFF00FFFF) | 0x00010000);
 	}
 }
@@ -280,7 +280,7 @@ static void pcie_rootport_aspm_quirk(struct pci_dev *pdev)
 				dev->pcie_cap + PCI_EXP_LNKCTL;
 
 		pci_bus_set_ops(pbus, &quirk_pcie_aspm_ops);
-		dev_info(&pbus->dev, "writes to ASPM control bits will be ignored\n");
+		pci_info(pbus, "writes to ASPM control bits will be ignored\n");
 	}
 
 }
@@ -348,7 +348,7 @@ static void pci_fixup_video(struct pci_dev *pdev)
 			res->end = res->start + 0x20000 - 1;
 			res->flags = IORESOURCE_MEM | IORESOURCE_ROM_SHADOW |
 				     IORESOURCE_PCI_FIXED;
-			dev_info(&pdev->dev, "Video device with shadowed ROM at %pR\n",
+			pci_info(pdev, "Video device with shadowed ROM at %pR\n",
 				 res);
 		}
 	}
@@ -391,11 +391,9 @@ static void pci_fixup_msi_k8t_onboard_sound(struct pci_dev *dev)
 		/* verify the change for status output */
 		pci_read_config_byte(dev, 0x50, &val);
 		if (val & 0x40)
-			dev_info(&dev->dev, "Detected MSI K8T Neo2-FIR; "
-					"can't enable onboard soundcard!\n");
+			pci_info(dev, "Detected MSI K8T Neo2-FIR; can't enable onboard soundcard!\n");
 		else
-			dev_info(&dev->dev, "Detected MSI K8T Neo2-FIR; "
-					"enabled onboard soundcard\n");
+			pci_info(dev, "Detected MSI K8T Neo2-FIR; enabled onboard soundcard\n");
 	}
 }
 DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_VIA, PCI_DEVICE_ID_VIA_8237,
@@ -530,7 +528,7 @@ static void sb600_hpet_quirk(struct pci_dev *dev)
 
 	if (r->flags & IORESOURCE_MEM && r->start == hpet_address) {
 		r->flags |= IORESOURCE_PCI_FIXED;
-		dev_info(&dev->dev, "reg 0x14 contains HPET; making it immovable\n");
+		pci_info(dev, "reg 0x14 contains HPET; making it immovable\n");
 	}
 }
 DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_ATI, 0x4385, sb600_hpet_quirk);
@@ -582,11 +580,22 @@ DECLARE_PCI_FIXUP_EARLY(PCI_VENDOR_ID_INTEL, 0x6fc0, pci_invalid_bar);
  */
 static void pci_fixup_amd_ehci_pme(struct pci_dev *dev)
 {
-	dev_info(&dev->dev, "PME# does not work under D3, disabling it\n");
+	pci_info(dev, "PME# does not work under D3, disabling it\n");
 	dev->pme_support &= ~((PCI_PM_CAP_PME_D3 | PCI_PM_CAP_PME_D3cold)
 		>> PCI_PM_CAP_PME_SHIFT);
 }
 DECLARE_PCI_FIXUP_FINAL(PCI_VENDOR_ID_AMD, 0x7808, pci_fixup_amd_ehci_pme);
+
+/*
+ * Device [1022:7914]
+ * When in D0, PME# doesn't get asserted when plugging USB 2.0 device.
+ */
+static void pci_fixup_amd_fch_xhci_pme(struct pci_dev *dev)
+{
+	pci_info(dev, "PME# does not work under D0, disabling it\n");
+	dev->pme_support &= ~(PCI_PM_CAP_PME_D0 >> PCI_PM_CAP_PME_SHIFT);
+}
+DECLARE_PCI_FIXUP_FINAL(PCI_VENDOR_ID_AMD, 0x7914, pci_fixup_amd_fch_xhci_pme);
 
 /*
  * Apple MacBook Pro: Avoid [mem 0x7fa00000-0x7fbfffff]
@@ -603,7 +612,6 @@ DECLARE_PCI_FIXUP_FINAL(PCI_VENDOR_ID_AMD, 0x7808, pci_fixup_amd_ehci_pme);
  */
 static void quirk_apple_mbp_poweroff(struct pci_dev *pdev)
 {
-	struct device *dev = &pdev->dev;
 	struct resource *res;
 
 	if ((!dmi_match(DMI_PRODUCT_NAME, "MacBookPro11,4") &&
@@ -614,9 +622,9 @@ static void quirk_apple_mbp_poweroff(struct pci_dev *pdev)
 	res = request_mem_region(0x7fa00000, 0x200000,
 				 "MacBook Pro poweroff workaround");
 	if (res)
-		dev_info(dev, "claimed %s %pR\n", res->name, res);
+		pci_info(pdev, "claimed %s %pR\n", res->name, res);
 	else
-		dev_info(dev, "can't work around MacBook Pro poweroff issue\n");
+		pci_info(pdev, "can't work around MacBook Pro poweroff issue\n");
 }
 DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_INTEL, 0x8c10, quirk_apple_mbp_poweroff);
 
@@ -736,7 +744,7 @@ static void pci_amd_enable_64bit_bar(struct pci_dev *dev)
 		/* We are resuming from suspend; just reenable the window */
 		res = conflict;
 	} else {
-		dev_info(&dev->dev, "adding root bus resource %pR (tainting kernel)\n",
+		pci_info(dev, "adding root bus resource %pR (tainting kernel)\n",
 			 res);
 		add_taint(TAINT_FIRMWARE_WORKAROUND, LOCKDEP_STILL_OK);
 		pci_bus_add_resource(dev->bus, res, 0);
