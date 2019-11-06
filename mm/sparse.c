@@ -483,7 +483,7 @@ static void __init sparse_buffer_init(unsigned long size, int nid)
 	phys_addr_t addr = __pa(MAX_DMA_ADDRESS);
 	WARN_ON(sparsemap_buf);	/* forgot to call sparse_buffer_fini()? */
 	sparsemap_buf =
-		memblock_alloc_try_nid_raw(size, PAGE_SIZE,
+		memblock_alloc_exact_nid_raw(size, PAGE_SIZE,
 						addr,
 						MEMBLOCK_ALLOC_ACCESSIBLE, nid);
 	sparsemap_buf_end = sparsemap_buf + size;
