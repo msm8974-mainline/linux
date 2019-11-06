@@ -11,6 +11,7 @@ TARGETS += efivarfs
 TARGETS += exec
 TARGETS += filesystems
 TARGETS += filesystems/binderfs
+TARGETS += filesystems/epoll
 TARGETS += firmware
 TARGETS += ftrace
 TARGETS += futex
