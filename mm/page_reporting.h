@@ -158,7 +158,7 @@ free_area_reporting(struct zone *zone, unsigned int order)
 	return false;
 }
 static inline struct list_head *
-get_unreported_tail(struct zone *zone, unsigned int order, int migratetype)
+get_unreported_tail(unsigned int order, int migratetype)
 {
 	return NULL;
 }
