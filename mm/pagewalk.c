@@ -65,7 +65,7 @@ again:
 			split_huge_pmd(walk->vma, pmd, addr);
 			if (pmd_trans_unstable(pmd))
 				goto again;
-		} else if (pmd_leaf(*pmd)) {
+		} else if (pmd_leaf(*pmd) || !pmd_present(*pmd)) {
 			continue;
 		}
 
@@ -107,7 +107,7 @@ static int walk_pud_range(p4d_t *p4d, unsigned long addr, unsigned long end,
 			split_huge_pud(walk->vma, pud, addr);
 			if (pud_none(*pud))
 				goto again;
-		} else if (pud_leaf(*pud)) {
+		} else if (pud_leaf(*pud) || !pud_present(*pud)) {
 			continue;
 		}
 
