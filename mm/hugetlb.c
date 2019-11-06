@@ -256,7 +256,7 @@ static long add_reservation_in_range(struct resv_map *resv, long f, long t,
 	struct file_region *rg = NULL, *trg = NULL, *nrg = NULL;
 
 	/* Locate the region we are before or in. */
-	list_for_each_entry (rg, head, link)
+	list_for_each_entry(rg, head, link)
 		if (f <= rg->to)
 			break;
 
@@ -268,7 +268,7 @@ static long add_reservation_in_range(struct resv_map *resv, long f, long t,
 
 	/* Check for and consume any regions we now overlap with. */
 	nrg = rg;
-	list_for_each_entry_safe (rg, trg, rg->link.prev, link) {
+	list_for_each_entry_safe(rg, trg, rg->link.prev, link) {
 		if (&rg->link == head)
 			break;
 		if (rg->from > t)
