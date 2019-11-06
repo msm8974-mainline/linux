@@ -154,6 +154,27 @@ void sysfs_remove_link(struct kobject *kobj, const char *name)
 EXPORT_SYMBOL_GPL(sysfs_remove_link);
 
 /**
+ *	sysfs_link_exists - test if a symlink exists in object's directory.
+ *	@kobj:	object we're acting for.
+ *	@name:	name of the symlink to test.
+ */
+bool sysfs_link_exists(struct kobject *kobj, const char *name)
+{
+	struct kernfs_node *parent = NULL, *kn;
+
+	if (!kobj)
+		parent = sysfs_root_kn;
+	else
+		parent = kobj->sd;
+
+	kn = kernfs_find_and_get(parent, name);
+	kernfs_put(kn);
+
+	return kn != NULL;
+}
+EXPORT_SYMBOL_GPL(sysfs_link_exists);
+
+/**
  *	sysfs_rename_link_ns - rename symlink in object's directory.
  *	@kobj:	object we're acting for.
  *	@targ:	object we're pointing to.

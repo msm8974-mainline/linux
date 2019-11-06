@@ -138,6 +138,8 @@ extern void unregister_one_node(int nid);
 extern int register_cpu_under_node(unsigned int cpu, unsigned int nid);
 extern int unregister_cpu_under_node(unsigned int cpu, unsigned int nid);
 extern void unregister_memory_block_under_nodes(struct memory_block *mem_blk);
+extern bool memory_block_registered_under_node(struct memory_block *mem,
+					       int nid);
 
 extern int register_memory_node_under_compute_node(unsigned int mem_nid,
 						   unsigned int cpu_nid,
@@ -170,6 +172,11 @@ static inline int unregister_cpu_under_node(unsigned int cpu, unsigned int nid)
 }
 static inline void unregister_memory_block_under_nodes(struct memory_block *mem_blk)
 {
+}
+static inline bool memory_block_registered_under_node(struct memory_block *mem,
+						      int nid)
+{
+	return true;
 }
 
 static inline void register_hugetlbfs_with_node(node_registration_func_t reg,

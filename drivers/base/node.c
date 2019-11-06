@@ -836,6 +836,15 @@ int link_mem_sections(int nid, unsigned long start_pfn, unsigned long end_pfn)
 				  register_mem_sect_under_node);
 }
 
+bool memory_block_registered_under_node(struct memory_block *mem, int nid)
+{
+	if (mem->nid == nid)
+		return true;
+	/* memory blocks can span multiple nodes. Check against the link. */
+	return sysfs_link_exists(&mem->dev.kobj,
+				 kobject_name(&node_devices[nid]->dev.kobj));
+}
+
 #ifdef CONFIG_HUGETLBFS
 /*
  * Handle per node hstate attribute [un]registration on transistions
