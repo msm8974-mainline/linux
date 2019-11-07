@@ -43,13 +43,14 @@ struct btrfs_caching_control {
 #define CACHING_CTL_WAKE_UP SZ_2M
 
 struct btrfs_block_group_cache {
-	struct btrfs_key key;
-	struct btrfs_block_group_item item;
 	struct btrfs_fs_info *fs_info;
 	struct inode *inode;
 	spinlock_t lock;
+	u64 start;
+	u64 length;
 	u64 pinned;
 	u64 reserved;
+	u64 used;
 	u64 delalloc_bytes;
 	u64 bytes_super;
 	u64 flags;
