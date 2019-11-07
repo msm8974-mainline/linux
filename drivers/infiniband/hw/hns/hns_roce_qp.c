@@ -332,9 +332,8 @@ static int check_sq_size_with_integrity(struct hns_roce_dev *hr_dev,
 	u8 max_sq_stride = ilog2(roundup_sq_stride);
 
 	/* Sanity check SQ size before proceeding */
-	if ((u32)(1 << ucmd->log_sq_bb_count) > hr_dev->caps.max_wqes ||
-	     ucmd->log_sq_stride > max_sq_stride ||
-	     ucmd->log_sq_stride < HNS_ROCE_IB_MIN_SQ_STRIDE) {
+	if (ucmd->log_sq_stride > max_sq_stride ||
+	    ucmd->log_sq_stride < HNS_ROCE_IB_MIN_SQ_STRIDE) {
 		ibdev_err(&hr_dev->ib_dev, "check SQ size error!\n");
 		return -EINVAL;
 	}
@@ -358,13 +357,16 @@ static int hns_roce_set_user_sq_size(struct hns_roce_dev *hr_dev,
 	u32 max_cnt;
 	int ret;
 
+	if (check_shl_overflow(1, ucmd->log_sq_bb_count, &hr_qp->sq.wqe_cnt) ||
+	    hr_qp->sq.wqe_cnt > hr_dev->caps.max_wqes)
+		return -EINVAL;
+
 	ret = check_sq_size_with_integrity(hr_dev, cap, ucmd);
 	if (ret) {
 		ibdev_err(&hr_dev->ib_dev, "Sanity check sq size failed\n");
 		return ret;
 	}
 
-	hr_qp->sq.wqe_cnt = 1 << ucmd->log_sq_bb_count;
 	hr_qp->sq.wqe_shift = ucmd->log_sq_stride;
 
 	max_cnt = max(1U, cap->max_send_sge);
@@ -391,37 +393,37 @@ static int hns_roce_set_user_sq_size(struct hns_roce_dev *hr_dev,
 
 	/* Get buf size, SQ and RQ  are aligned to page_szie */
 	if (hr_dev->caps.max_sq_sg <= 2) {
-		hr_qp->buff_size = HNS_ROCE_ALOGN_UP((hr_qp->rq.wqe_cnt <<
+		hr_qp->buff_size = HNS_ROCE_ALIGN_UP((hr_qp->rq.wqe_cnt <<
 					     hr_qp->rq.wqe_shift), PAGE_SIZE) +
-				   HNS_ROCE_ALOGN_UP((hr_qp->sq.wqe_cnt <<
+				   HNS_ROCE_ALIGN_UP((hr_qp->sq.wqe_cnt <<
 					     hr_qp->sq.wqe_shift), PAGE_SIZE);
 
 		hr_qp->sq.offset = 0;
-		hr_qp->rq.offset = HNS_ROCE_ALOGN_UP((hr_qp->sq.wqe_cnt <<
+		hr_qp->rq.offset = HNS_ROCE_ALIGN_UP((hr_qp->sq.wqe_cnt <<
 					     hr_qp->sq.wqe_shift), PAGE_SIZE);
 	} else {
 		page_size = 1 << (hr_dev->caps.mtt_buf_pg_sz + PAGE_SHIFT);
 		hr_qp->sge.sge_cnt = ex_sge_num ?
 		   max(page_size / (1 << hr_qp->sge.sge_shift), ex_sge_num) : 0;
-		hr_qp->buff_size = HNS_ROCE_ALOGN_UP((hr_qp->rq.wqe_cnt <<
+		hr_qp->buff_size = HNS_ROCE_ALIGN_UP((hr_qp->rq.wqe_cnt <<
 					     hr_qp->rq.wqe_shift), page_size) +
-				   HNS_ROCE_ALOGN_UP((hr_qp->sge.sge_cnt <<
+				   HNS_ROCE_ALIGN_UP((hr_qp->sge.sge_cnt <<
 					     hr_qp->sge.sge_shift), page_size) +
-				   HNS_ROCE_ALOGN_UP((hr_qp->sq.wqe_cnt <<
+				   HNS_ROCE_ALIGN_UP((hr_qp->sq.wqe_cnt <<
 					     hr_qp->sq.wqe_shift), page_size);
 
 		hr_qp->sq.offset = 0;
 		if (ex_sge_num) {
-			hr_qp->sge.offset = HNS_ROCE_ALOGN_UP(
+			hr_qp->sge.offset = HNS_ROCE_ALIGN_UP(
 							(hr_qp->sq.wqe_cnt <<
 							hr_qp->sq.wqe_shift),
 							page_size);
 			hr_qp->rq.offset = hr_qp->sge.offset +
-					HNS_ROCE_ALOGN_UP((hr_qp->sge.sge_cnt <<
+					HNS_ROCE_ALIGN_UP((hr_qp->sge.sge_cnt <<
 						hr_qp->sge.sge_shift),
 						page_size);
 		} else {
-			hr_qp->rq.offset = HNS_ROCE_ALOGN_UP(
+			hr_qp->rq.offset = HNS_ROCE_ALIGN_UP(
 							(hr_qp->sq.wqe_cnt <<
 							hr_qp->sq.wqe_shift),
 							page_size);
@@ -591,19 +593,19 @@ static int hns_roce_set_kernel_sq_size(struct hns_roce_dev *hr_dev,
 	/* Get buf size, SQ and RQ are aligned to PAGE_SIZE */
 	page_size = 1 << (hr_dev->caps.mtt_buf_pg_sz + PAGE_SHIFT);
 	hr_qp->sq.offset = 0;
-	size = HNS_ROCE_ALOGN_UP(hr_qp->sq.wqe_cnt << hr_qp->sq.wqe_shift,
+	size = HNS_ROCE_ALIGN_UP(hr_qp->sq.wqe_cnt << hr_qp->sq.wqe_shift,
 				 page_size);
 
 	if (hr_dev->caps.max_sq_sg > 2 && hr_qp->sge.sge_cnt) {
 		hr_qp->sge.sge_cnt = max(page_size/(1 << hr_qp->sge.sge_shift),
 					(u32)hr_qp->sge.sge_cnt);
 		hr_qp->sge.offset = size;
-		size += HNS_ROCE_ALOGN_UP(hr_qp->sge.sge_cnt <<
+		size += HNS_ROCE_ALIGN_UP(hr_qp->sge.sge_cnt <<
 					  hr_qp->sge.sge_shift, page_size);
 	}
 
 	hr_qp->rq.offset = size;
-	size += HNS_ROCE_ALOGN_UP((hr_qp->rq.wqe_cnt << hr_qp->rq.wqe_shift),
+	size += HNS_ROCE_ALIGN_UP((hr_qp->rq.wqe_cnt << hr_qp->rq.wqe_shift),
 				  page_size);
 	hr_qp->buff_size = size;
 

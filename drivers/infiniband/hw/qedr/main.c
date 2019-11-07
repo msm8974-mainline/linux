@@ -212,6 +212,7 @@ static const struct ib_device_ops qedr_dev_ops = {
 	.get_link_layer = qedr_link_layer,
 	.map_mr_sg = qedr_map_mr_sg,
 	.mmap = qedr_mmap,
+	.mmap_free = qedr_mmap_free,
 	.modify_port = qedr_modify_port,
 	.modify_qp = qedr_modify_qp,
 	.modify_srq = qedr_modify_srq,
@@ -357,9 +358,10 @@ static int qedr_alloc_resources(struct qedr_dev *dev)
 		return -ENOMEM;
 
 	spin_lock_init(&dev->sgid_lock);
+	xa_init_flags(&dev->srqs, XA_FLAGS_LOCK_IRQ);
 
 	if (IS_IWARP(dev)) {
-		xa_init_flags(&dev->qps, XA_FLAGS_LOCK_IRQ);
+		xa_init(&dev->qps);
 		dev->iwarp_wq = create_singlethread_workqueue("qedr_iwarpq");
 	}
 

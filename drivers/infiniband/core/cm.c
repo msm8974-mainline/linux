@@ -1,36 +1,10 @@
+// SPDX-License-Identifier: GPL-2.0 OR Linux-OpenIB
 /*
  * Copyright (c) 2004-2007 Intel Corporation.  All rights reserved.
  * Copyright (c) 2004 Topspin Corporation.  All rights reserved.
  * Copyright (c) 2004, 2005 Voltaire Corporation.  All rights reserved.
  * Copyright (c) 2005 Sun Microsystems, Inc. All rights reserved.
- *
- * This software is available to you under a choice of one of two
- * licenses.  You may choose to be licensed under the terms of the GNU
- * General Public License (GPL) Version 2, available from the file
- * COPYING in the main directory of this source tree, or the
- * OpenIB.org BSD license below:
- *
- *     Redistribution and use in source and binary forms, with or
- *     without modification, are permitted provided that the following
- *     conditions are met:
- *
- *      - Redistributions of source code must retain the above
- *        copyright notice, this list of conditions and the following
- *        disclaimer.
- *
- *      - Redistributions in binary form must reproduce the above
- *        copyright notice, this list of conditions and the following
- *        disclaimer in the documentation and/or other materials
- *        provided with the distribution.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
- * EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
- * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
- * NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS
- * BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN
- * ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
- * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- * SOFTWARE.
+ * Copyright (c) 2019, Mellanox Technologies inc.  All rights reserved.
  */
 
 #include <linux/completion.h>
@@ -246,7 +220,7 @@ struct cm_work {
 };
 
 struct cm_timewait_info {
-	struct cm_work work;			/* Must be first. */
+	struct cm_work work;
 	struct list_head list;
 	struct rb_node remote_qp_node;
 	struct rb_node remote_id_node;
@@ -1523,14 +1497,6 @@ static int cm_issue_rej(struct cm_port *port,
 		cm_free_msg(msg);
 
 	return ret;
-}
-
-static inline int cm_is_active_peer(__be64 local_ca_guid, __be64 remote_ca_guid,
-				    __be32 local_qpn, __be32 remote_qpn)
-{
-	return (be64_to_cpu(local_ca_guid) > be64_to_cpu(remote_ca_guid) ||
-		((local_ca_guid == remote_ca_guid) &&
-		 (be32_to_cpu(local_qpn) > be32_to_cpu(remote_qpn))));
 }
 
 static bool cm_req_has_alt_path(struct cm_req_msg *req_msg)
@@ -3434,7 +3400,7 @@ static int cm_timewait_handler(struct cm_work *work)
 	struct cm_id_private *cm_id_priv;
 	int ret;
 
-	timewait_info = (struct cm_timewait_info *)work;
+	timewait_info = container_of(work, struct cm_timewait_info, work);
 	spin_lock_irq(&cm.lock);
 	list_del(&timewait_info->list);
 	spin_unlock_irq(&cm.lock);
