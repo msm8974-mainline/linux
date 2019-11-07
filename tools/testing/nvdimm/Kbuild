@@ -93,4 +93,8 @@ libnvdimm-y += dimm_devs.o
 libnvdimm-y += libnvdimm_test.o
 libnvdimm-y += config_check.o
 
+# This intentionally overrides the original libnvdimm.ko
+# Suppress 'exported twice' warnings from the modpost.
+KBUILD_MULTI_EXPORT_NO_WARN := 1
+
 obj-m += test/
