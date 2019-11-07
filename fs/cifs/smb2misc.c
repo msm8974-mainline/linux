@@ -29,6 +29,7 @@
 #include "cifs_unicode.h"
 #include "smb2status.h"
 #include "smb2glob.h"
+#include "nterr.h"
 
 static int
 check_smb2_hdr(struct smb2_sync_hdr *shdr, __u64 mid)
@@ -128,7 +129,8 @@ static __u32 get_neg_ctxt_len(struct smb2_sync_hdr *hdr, __u32 len,
 }
 
 int
-smb2_check_message(char *buf, unsigned int len, struct TCP_Server_Info *srvr)
+smb2_check_message(char *buf, unsigned int len, struct TCP_Server_Info *srvr,
+		   bool decrypted)
 {
 	struct smb2_sync_hdr *shdr = (struct smb2_sync_hdr *)buf;
 	struct smb2_sync_pdu *pdu = (struct smb2_sync_pdu *)shdr;
@@ -252,11 +254,20 @@ smb2_check_message(char *buf, unsigned int len, struct TCP_Server_Info *srvr)
 		 * If pad is longer than eight bytes, log the server behavior
 		 * (once), since may indicate a problem but allow it and continue
 		 * since the frame is parseable.
+		 * (once), since may indicate a problem but allow it and
+		 * continue since the frame is parseable.
+		 *
+		 * Do not log warning below if decrypted since for the encrypted
+		 * case len can include total of more than one SMB request
+		 * when part of a compounded req while clc_len will be smaller
+		 * since it is calculated for only one of the requests
 		 */
 		if (clc_len < len) {
-			pr_warn_once(
-			     "srv rsp padded more than expected. Length %d not %d for cmd:%d mid:%llu\n",
-			     len, clc_len, command, mid);
+			if (!decrypted)
+				pr_warn_once(
+				    "srv rsp padded more than expected. "
+				    "Length %d not %d for cmd:%d mid:%llu\n",
+				    len, clc_len, command, mid);
 			return 0;
 		}
 		pr_warn_once(
@@ -673,10 +684,10 @@ smb2_is_valid_oplock_break(char *buffer, struct TCP_Server_Info *server)
 	spin_lock(&cifs_tcp_ses_lock);
 	list_for_each(tmp, &server->smb_ses_list) {
 		ses = list_entry(tmp, struct cifs_ses, smb_ses_list);
+
 		list_for_each(tmp1, &ses->tcon_list) {
 			tcon = list_entry(tmp1, struct cifs_tcon, tcon_list);
 
-			cifs_stats_inc(&tcon->stats.cifs_stats.num_oplock_brks);
 			spin_lock(&tcon->open_file_lock);
 			list_for_each(tmp2, &tcon->openFileList) {
 				cfile = list_entry(tmp2, struct cifsFileInfo,
@@ -688,6 +699,8 @@ smb2_is_valid_oplock_break(char *buffer, struct TCP_Server_Info *server)
 					continue;
 
 				cifs_dbg(FYI, "file id match, oplock break\n");
+				cifs_stats_inc(
+				    &tcon->stats.cifs_stats.num_oplock_brks);
 				cinode = CIFS_I(d_inode(cfile->dentry));
 				spin_lock(&cfile->file_info_lock);
 				if (!CIFS_CACHE_WRITE(cinode) &&
@@ -720,9 +733,6 @@ smb2_is_valid_oplock_break(char *buffer, struct TCP_Server_Info *server)
 				return true;
 			}
 			spin_unlock(&tcon->open_file_lock);
-			spin_unlock(&cifs_tcp_ses_lock);
-			cifs_dbg(FYI, "No matching file for oplock break\n");
-			return true;
 		}
 	}
 	spin_unlock(&cifs_tcp_ses_lock);
@@ -788,23 +798,37 @@ smb311_update_preauth_hash(struct cifs_ses *ses, struct kvec *iov, int nvec)
 	int i, rc;
 	struct sdesc *d;
 	struct smb2_sync_hdr *hdr;
+	struct TCP_Server_Info *server = cifs_ses_server(ses);
 
-	if (ses->server->tcpStatus == CifsGood) {
-		/* skip non smb311 connections */
-		if (ses->server->dialect != SMB311_PROT_ID)
-			return 0;
+	hdr = (struct smb2_sync_hdr *)iov[0].iov_base;
+	/* neg prot are always taken */
+	if (hdr->Command == SMB2_NEGOTIATE)
+		goto ok;
 
-		/* skip last sess setup response */
-		hdr = (struct smb2_sync_hdr *)iov[0].iov_base;
-		if (hdr->Flags & SMB2_FLAGS_SIGNED)
-			return 0;
-	}
+	/*
+	 * If we process a command which wasn't a negprot it means the
+	 * neg prot was already done, so the server dialect was set
+	 * and we can test it. Preauth requires 3.1.1 for now.
+	 */
+	if (server->dialect != SMB311_PROT_ID)
+		return 0;
 
-	rc = smb311_crypto_shash_allocate(ses->server);
+	if (hdr->Command != SMB2_SESSION_SETUP)
+		return 0;
+
+	/* skip last sess setup response */
+	if ((hdr->Flags & SMB2_FLAGS_SERVER_TO_REDIR)
+	    && (hdr->Status == NT_STATUS_OK
+		|| (hdr->Status !=
+		    cpu_to_le32(NT_STATUS_MORE_PROCESSING_REQUIRED))))
+		return 0;
+
+ok:
+	rc = smb311_crypto_shash_allocate(server);
 	if (rc)
 		return rc;
 
-	d = ses->server->secmech.sdescsha512;
+	d = server->secmech.sdescsha512;
 	rc = crypto_shash_init(&d->shash);
 	if (rc) {
 		cifs_dbg(VFS, "%s: could not init sha512 shash\n", __func__);

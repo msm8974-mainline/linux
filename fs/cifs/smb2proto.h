@@ -35,7 +35,7 @@ struct smb_rqst;
  */
 extern int map_smb2_to_linux_error(char *buf, bool log_err);
 extern int smb2_check_message(char *buf, unsigned int length,
-			      struct TCP_Server_Info *server);
+			      struct TCP_Server_Info *server, bool decrypted);
 extern unsigned int smb2_calc_size(void *buf, struct TCP_Server_Info *server);
 extern char *smb2_get_data_area_len(int *off, int *len,
 				    struct smb2_sync_hdr *shdr);
@@ -46,7 +46,8 @@ extern int smb2_verify_signature(struct smb_rqst *, struct TCP_Server_Info *);
 extern int smb2_check_receive(struct mid_q_entry *mid,
 			      struct TCP_Server_Info *server, bool log_error);
 extern struct mid_q_entry *smb2_setup_request(struct cifs_ses *ses,
-			      struct smb_rqst *rqst);
+					      struct TCP_Server_Info *,
+					      struct smb_rqst *rqst);
 extern struct mid_q_entry *smb2_setup_async_request(
 			struct TCP_Server_Info *server, struct smb_rqst *rqst);
 extern struct cifs_ses *smb2_find_smb_ses(struct TCP_Server_Info *server,
