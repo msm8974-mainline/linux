@@ -41,6 +41,7 @@ Hardware Monitoring Kernel Drivers
    asb100
    asc7621
    aspeed-pwm-tacho
+   bel-pfe
    coretemp
    da9052
    da9055
@@ -90,6 +91,7 @@ Hardware Monitoring Kernel Drivers
    lm95245
    lochnagar
    ltc2945
+   ltc2947
    ltc2978
    ltc2990
    ltc3815
