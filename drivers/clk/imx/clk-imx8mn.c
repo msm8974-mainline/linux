@@ -25,20 +25,6 @@ static u32 share_count_disp;
 static u32 share_count_pdm;
 static u32 share_count_nand;
 
-enum {
-	ARM_PLL,
-	GPU_PLL,
-	VPU_PLL,
-	SYS_PLL1,
-	SYS_PLL2,
-	SYS_PLL3,
-	DRAM_PLL,
-	AUDIO_PLL1,
-	AUDIO_PLL2,
-	VIDEO_PLL2,
-	NR_PLLS,
-};
-
 static const char * const pll_ref_sels[] = { "osc_24m", "dummy", "dummy", "dummy", };
 static const char * const audio_pll1_bypass_sels[] = {"audio_pll1", "audio_pll1_ref_sel", };
 static const char * const audio_pll2_bypass_sels[] = {"audio_pll2", "audio_pll2_ref_sel", };
@@ -554,7 +540,7 @@ static int imx8mn_clocks_probe(struct platform_device *pdev)
 					   clks[IMX8MN_CLK_A53_DIV],
 					   clks[IMX8MN_CLK_A53_SRC],
 					   clks[IMX8MN_ARM_PLL_OUT],
-					   clks[IMX8MN_CLK_24M]);
+					   clks[IMX8MN_SYS_PLL1_800M]);
 
 	imx_check_clocks(clks, ARRAY_SIZE(clks));
 
