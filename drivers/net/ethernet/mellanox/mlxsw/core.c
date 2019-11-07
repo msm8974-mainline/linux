@@ -127,6 +127,16 @@ bool mlxsw_core_res_query_enabled(const struct mlxsw_core *mlxsw_core)
 }
 EXPORT_SYMBOL(mlxsw_core_res_query_enabled);
 
+bool
+mlxsw_core_fw_rev_minor_subminor_validate(const struct mlxsw_fw_rev *rev,
+					  const struct mlxsw_fw_rev *req_rev)
+{
+	return rev->minor > req_rev->minor ||
+	       (rev->minor == req_rev->minor &&
+		rev->subminor >= req_rev->subminor);
+}
+EXPORT_SYMBOL(mlxsw_core_fw_rev_minor_subminor_validate);
+
 struct mlxsw_rx_listener_item {
 	struct list_head list;
 	struct mlxsw_rx_listener rxl;
@@ -985,6 +995,7 @@ mlxsw_devlink_info_get(struct devlink *devlink, struct devlink_info_req *req,
 
 static int
 mlxsw_devlink_core_bus_device_reload_down(struct devlink *devlink,
+					  bool netns_change,
 					  struct netlink_ext_ack *extack)
 {
 	struct mlxsw_core *mlxsw_core = devlink_priv(devlink);
@@ -1005,7 +1016,7 @@ mlxsw_devlink_core_bus_device_reload_up(struct devlink *devlink,
 	return mlxsw_core_bus_device_register(mlxsw_core->bus_info,
 					      mlxsw_core->bus,
 					      mlxsw_core->bus_priv, true,
-					      devlink);
+					      devlink, extack);
 }
 
 static int mlxsw_devlink_flash_update(struct devlink *devlink,
@@ -1098,7 +1109,8 @@ static int
 __mlxsw_core_bus_device_register(const struct mlxsw_bus_info *mlxsw_bus_info,
 				 const struct mlxsw_bus *mlxsw_bus,
 				 void *bus_priv, bool reload,
-				 struct devlink *devlink)
+				 struct devlink *devlink,
+				 struct netlink_ext_ack *extack)
 {
 	const char *device_kind = mlxsw_bus_info->device_kind;
 	struct mlxsw_core *mlxsw_core;
@@ -1172,7 +1184,7 @@ __mlxsw_core_bus_device_register(const struct mlxsw_bus_info *mlxsw_bus_info,
 	}
 
 	if (mlxsw_driver->init) {
-		err = mlxsw_driver->init(mlxsw_core, mlxsw_bus_info);
+		err = mlxsw_driver->init(mlxsw_core, mlxsw_bus_info, extack);
 		if (err)
 			goto err_driver_init;
 	}
@@ -1223,14 +1235,16 @@ err_devlink_alloc:
 int mlxsw_core_bus_device_register(const struct mlxsw_bus_info *mlxsw_bus_info,
 				   const struct mlxsw_bus *mlxsw_bus,
 				   void *bus_priv, bool reload,
-				   struct devlink *devlink)
+				   struct devlink *devlink,
+				   struct netlink_ext_ack *extack)
 {
 	bool called_again = false;
 	int err;
 
 again:
 	err = __mlxsw_core_bus_device_register(mlxsw_bus_info, mlxsw_bus,
-					       bus_priv, reload, devlink);
+					       bus_priv, reload,
+					       devlink, extack);
 	/* -EAGAIN is returned in case the FW was updated. FW needs
 	 * a reset, so lets try to call __mlxsw_core_bus_device_register()
 	 * again.
@@ -2002,6 +2016,35 @@ mlxsw_core_port_devlink_port_get(struct mlxsw_core *mlxsw_core,
 	return devlink_port;
 }
 EXPORT_SYMBOL(mlxsw_core_port_devlink_port_get);
+
+int mlxsw_core_module_max_width(struct mlxsw_core *mlxsw_core, u8 module)
+{
+	enum mlxsw_reg_pmtm_module_type module_type;
+	char pmtm_pl[MLXSW_REG_PMTM_LEN];
+	int err;
+
+	mlxsw_reg_pmtm_pack(pmtm_pl, module);
+	err = mlxsw_reg_query(mlxsw_core, MLXSW_REG(pmtm), pmtm_pl);
+	if (err)
+		return err;
+	mlxsw_reg_pmtm_unpack(pmtm_pl, &module_type);
+
+	/* Here we need to get the module width according to the module type. */
+
+	switch (module_type) {
+	case MLXSW_REG_PMTM_MODULE_TYPE_BP_4X: /* fall through */
+	case MLXSW_REG_PMTM_MODULE_TYPE_BP_QSFP:
+		return 4;
+	case MLXSW_REG_PMTM_MODULE_TYPE_BP_2X:
+		return 2;
+	case MLXSW_REG_PMTM_MODULE_TYPE_BP_SFP: /* fall through */
+	case MLXSW_REG_PMTM_MODULE_TYPE_BP_1X:
+		return 1;
+	default:
+		return -EINVAL;
+	}
+}
+EXPORT_SYMBOL(mlxsw_core_module_max_width);
 
 static void mlxsw_core_buf_dump_dbg(struct mlxsw_core *mlxsw_core,
 				    const char *buf, size_t size)
