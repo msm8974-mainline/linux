@@ -726,7 +726,7 @@ static void stop_this_handle(handle_t *handle)
 	if (atomic_dec_and_test(&transaction->t_updates))
 		wake_up(&journal->j_wait_updates);
 
-	rwsem_release(&journal->j_trans_commit_map, 1, _THIS_IP_);
+	rwsem_release(&journal->j_trans_commit_map, _THIS_IP_);
 	/*
 	 * Scope of the GFP_NOFS context is over here and so we can restore the
 	 * original alloc context.
