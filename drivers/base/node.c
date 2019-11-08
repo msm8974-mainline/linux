@@ -496,20 +496,17 @@ static ssize_t node_read_vmstat(struct device *dev,
 	int n = 0;
 
 	for (i = 0; i < NR_VM_ZONE_STAT_ITEMS; i++)
-		n += sprintf(buf+n, "%s %lu\n", vmstat_text[i],
+		n += sprintf(buf+n, "%s %lu\n", zone_stat_name(i),
 			     sum_zone_node_page_state(nid, i));
 
 #ifdef CONFIG_NUMA
 	for (i = 0; i < NR_VM_NUMA_STAT_ITEMS; i++)
-		n += sprintf(buf+n, "%s %lu\n",
-			     vmstat_text[i + NR_VM_ZONE_STAT_ITEMS],
+		n += sprintf(buf+n, "%s %lu\n", numa_stat_name(i),
 			     sum_zone_numa_state(nid, i));
 #endif
 
 	for (i = 0; i < NR_VM_NODE_STAT_ITEMS; i++)
-		n += sprintf(buf+n, "%s %lu\n",
-			     vmstat_text[i + NR_VM_ZONE_STAT_ITEMS +
-			     NR_VM_NUMA_STAT_ITEMS],
+		n += sprintf(buf+n, "%s %lu\n", node_stat_name(i),
 			     node_page_state(pgdat, i));
 
 	return n;
@@ -834,6 +831,15 @@ int link_mem_sections(int nid, unsigned long start_pfn, unsigned long end_pfn)
 	return walk_memory_blocks(PFN_PHYS(start_pfn),
 				  PFN_PHYS(end_pfn - start_pfn), (void *)&nid,
 				  register_mem_sect_under_node);
+}
+
+bool memory_block_registered_under_node(struct memory_block *mem, int nid)
+{
+	if (mem->nid == nid)
+		return true;
+	/* memory blocks can span multiple nodes. Check against the link. */
+	return sysfs_link_exists(&mem->dev.kobj,
+				 kobject_name(&node_devices[nid]->dev.kobj));
 }
 
 #ifdef CONFIG_HUGETLBFS
