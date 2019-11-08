@@ -117,7 +117,7 @@ struct atmel_aes_ctx {
 struct atmel_aes_ctr_ctx {
 	struct atmel_aes_base_ctx	base;
 
-	u32			iv[AES_BLOCK_SIZE / sizeof(u32)];
+	__be32			iv[AES_BLOCK_SIZE / sizeof(u32)];
 	size_t			offset;
 	struct scatterlist	src[2];
 	struct scatterlist	dst[2];
@@ -129,13 +129,13 @@ struct atmel_aes_gcm_ctx {
 	struct scatterlist	src[2];
 	struct scatterlist	dst[2];
 
-	u32			j0[AES_BLOCK_SIZE / sizeof(u32)];
+	__be32			j0[AES_BLOCK_SIZE / sizeof(u32)];
 	u32			tag[AES_BLOCK_SIZE / sizeof(u32)];
-	u32			ghash[AES_BLOCK_SIZE / sizeof(u32)];
+	__be32			ghash[AES_BLOCK_SIZE / sizeof(u32)];
 	size_t			textlen;
 
-	const u32		*ghash_in;
-	u32			*ghash_out;
+	const __be32		*ghash_in;
+	__be32			*ghash_out;
 	atmel_aes_fn_t		ghash_resume;
 };
 
@@ -388,13 +388,13 @@ static void atmel_aes_write_n(struct atmel_aes_dev *dd, u32 offset,
 }
 
 static inline void atmel_aes_read_block(struct atmel_aes_dev *dd, u32 offset,
-					u32 *value)
+					void *value)
 {
 	atmel_aes_read_n(dd, offset, value, SIZE_IN_WORDS(AES_BLOCK_SIZE));
 }
 
 static inline void atmel_aes_write_block(struct atmel_aes_dev *dd, u32 offset,
-					 const u32 *value)
+					 const void *value)
 {
 	atmel_aes_write_n(dd, offset, value, SIZE_IN_WORDS(AES_BLOCK_SIZE));
 }
@@ -490,6 +490,29 @@ static inline bool atmel_aes_is_encrypt(const struct atmel_aes_dev *dd)
 static void atmel_aes_authenc_complete(struct atmel_aes_dev *dd, int err);
 #endif
 
+static void atmel_aes_set_iv_as_last_ciphertext_block(struct atmel_aes_dev *dd)
+{
+	struct ablkcipher_request *req = ablkcipher_request_cast(dd->areq);
+	struct atmel_aes_reqctx *rctx = ablkcipher_request_ctx(req);
+	struct crypto_ablkcipher *ablkcipher = crypto_ablkcipher_reqtfm(req);
+	unsigned int ivsize = crypto_ablkcipher_ivsize(ablkcipher);
+
+	if (req->nbytes < ivsize)
+		return;
+
+	if (rctx->mode & AES_FLAGS_ENCRYPT) {
+		scatterwalk_map_and_copy(req->info, req->dst,
+					 req->nbytes - ivsize, ivsize, 0);
+	} else {
+		if (req->src == req->dst)
+			memcpy(req->info, rctx->lastc, ivsize);
+		else
+			scatterwalk_map_and_copy(req->info, req->src,
+						 req->nbytes - ivsize,
+						 ivsize, 0);
+	}
+}
+
 static inline int atmel_aes_complete(struct atmel_aes_dev *dd, int err)
 {
 #ifdef CONFIG_CRYPTO_DEV_ATMEL_AUTHENC
@@ -500,26 +523,8 @@ static inline int atmel_aes_complete(struct atmel_aes_dev *dd, int err)
 	clk_disable(dd->iclk);
 	dd->flags &= ~AES_FLAGS_BUSY;
 
-	if (!dd->ctx->is_aead) {
-		struct ablkcipher_request *req =
-			ablkcipher_request_cast(dd->areq);
-		struct atmel_aes_reqctx *rctx = ablkcipher_request_ctx(req);
-		struct crypto_ablkcipher *ablkcipher =
-			crypto_ablkcipher_reqtfm(req);
-		int ivsize = crypto_ablkcipher_ivsize(ablkcipher);
-
-		if (rctx->mode & AES_FLAGS_ENCRYPT) {
-			scatterwalk_map_and_copy(req->info, req->dst,
-				req->nbytes - ivsize, ivsize, 0);
-		} else {
-			if (req->src == req->dst) {
-				memcpy(req->info, rctx->lastc, ivsize);
-			} else {
-				scatterwalk_map_and_copy(req->info, req->src,
-					req->nbytes - ivsize, ivsize, 0);
-			}
-		}
-	}
+	if (!dd->ctx->is_aead)
+		atmel_aes_set_iv_as_last_ciphertext_block(dd);
 
 	if (dd->is_async)
 		dd->areq->complete(dd->areq, err);
@@ -530,7 +535,7 @@ static inline int atmel_aes_complete(struct atmel_aes_dev *dd, int err)
 }
 
 static void atmel_aes_write_ctrl_key(struct atmel_aes_dev *dd, bool use_dma,
-				     const u32 *iv, const u32 *key, int keylen)
+				     const __be32 *iv, const u32 *key, int keylen)
 {
 	u32 valmr = 0;
 
@@ -561,7 +566,7 @@ static void atmel_aes_write_ctrl_key(struct atmel_aes_dev *dd, bool use_dma,
 }
 
 static inline void atmel_aes_write_ctrl(struct atmel_aes_dev *dd, bool use_dma,
-					const u32 *iv)
+					const __be32 *iv)
 
 {
 	atmel_aes_write_ctrl_key(dd, use_dma, iv,
@@ -1125,10 +1130,12 @@ static int atmel_aes_crypt(struct ablkcipher_request *req, unsigned long mode)
 	rctx->mode = mode;
 
 	if (!(mode & AES_FLAGS_ENCRYPT) && (req->src == req->dst)) {
-		int ivsize = crypto_ablkcipher_ivsize(ablkcipher);
+		unsigned int ivsize = crypto_ablkcipher_ivsize(ablkcipher);
 
-		scatterwalk_map_and_copy(rctx->lastc, req->src,
-			(req->nbytes - ivsize), ivsize, 0);
+		if (req->nbytes >= ivsize)
+			scatterwalk_map_and_copy(rctx->lastc, req->src,
+						 req->nbytes - ivsize,
+						 ivsize, 0);
 	}
 
 	return atmel_aes_handle_queue(dd, &req->base);
@@ -1450,7 +1457,7 @@ static struct crypto_alg aes_cfb64_alg = {
 
 static int atmel_aes_gcm_ghash(struct atmel_aes_dev *dd,
 			       const u32 *data, size_t datalen,
-			       const u32 *ghash_in, u32 *ghash_out,
+			       const __be32 *ghash_in, __be32 *ghash_out,
 			       atmel_aes_fn_t resume);
 static int atmel_aes_gcm_ghash_init(struct atmel_aes_dev *dd);
 static int atmel_aes_gcm_ghash_finalize(struct atmel_aes_dev *dd);
@@ -1471,7 +1478,7 @@ atmel_aes_gcm_ctx_cast(struct atmel_aes_base_ctx *ctx)
 
 static int atmel_aes_gcm_ghash(struct atmel_aes_dev *dd,
 			       const u32 *data, size_t datalen,
-			       const u32 *ghash_in, u32 *ghash_out,
+			       const __be32 *ghash_in, __be32 *ghash_out,
 			       atmel_aes_fn_t resume)
 {
 	struct atmel_aes_gcm_ctx *ctx = atmel_aes_gcm_ctx_cast(dd->ctx);
@@ -1558,7 +1565,7 @@ static int atmel_aes_gcm_start(struct atmel_aes_dev *dd)
 
 	memcpy(data, iv, ivsize);
 	memset(data + ivsize, 0, padlen + sizeof(u64));
-	((u64 *)(data + datalen))[-1] = cpu_to_be64(ivsize * 8);
+	((__be64 *)(data + datalen))[-1] = cpu_to_be64(ivsize * 8);
 
 	return atmel_aes_gcm_ghash(dd, (const u32 *)data, datalen,
 				   NULL, ctx->j0, atmel_aes_gcm_process);
@@ -1591,7 +1598,7 @@ static int atmel_aes_gcm_length(struct atmel_aes_dev *dd)
 {
 	struct atmel_aes_gcm_ctx *ctx = atmel_aes_gcm_ctx_cast(dd->ctx);
 	struct aead_request *req = aead_request_cast(dd->areq);
-	u32 j0_lsw, *j0 = ctx->j0;
+	__be32 j0_lsw, *j0 = ctx->j0;
 	size_t padlen;
 
 	/* Write incr32(J0) into IV. */
@@ -1674,7 +1681,7 @@ static int atmel_aes_gcm_tag_init(struct atmel_aes_dev *dd)
 {
 	struct atmel_aes_gcm_ctx *ctx = atmel_aes_gcm_ctx_cast(dd->ctx);
 	struct aead_request *req = aead_request_cast(dd->areq);
-	u64 *data = dd->buf;
+	__be64 *data = dd->buf;
 
 	if (likely(dd->flags & AES_FLAGS_GTAGEN)) {
 		if (!(atmel_aes_read(dd, AES_ISR) & AES_INT_TAGRDY)) {
@@ -1885,7 +1892,7 @@ static int atmel_aes_xts_process_data(struct atmel_aes_dev *dd)
 	struct ablkcipher_request *req = ablkcipher_request_cast(dd->areq);
 	bool use_dma = (req->nbytes >= ATMEL_AES_DMA_THRESHOLD);
 	u32 tweak[AES_BLOCK_SIZE / sizeof(u32)];
-	static const u32 one[AES_BLOCK_SIZE / sizeof(u32)] = {cpu_to_le32(1), };
+	static const __le32 one[AES_BLOCK_SIZE / sizeof(u32)] = {cpu_to_le32(1), };
 	u8 *tweak_bytes = (u8 *)tweak;
 	int i;
 

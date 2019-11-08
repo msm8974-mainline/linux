@@ -44,7 +44,8 @@ static struct sun4i_ss_alg_template ss_algs[] = {
 				.cra_blocksize = MD5_HMAC_BLOCK_SIZE,
 				.cra_ctxsize = sizeof(struct sun4i_req_ctx),
 				.cra_module = THIS_MODULE,
-				.cra_init = sun4i_hash_crainit
+				.cra_init = sun4i_hash_crainit,
+				.cra_exit = sun4i_hash_craexit,
 			}
 		}
 	}
@@ -70,7 +71,8 @@ static struct sun4i_ss_alg_template ss_algs[] = {
 				.cra_blocksize = SHA1_BLOCK_SIZE,
 				.cra_ctxsize = sizeof(struct sun4i_req_ctx),
 				.cra_module = THIS_MODULE,
-				.cra_init = sun4i_hash_crainit
+				.cra_init = sun4i_hash_crainit,
+				.cra_exit = sun4i_hash_craexit,
 			}
 		}
 	}
@@ -223,6 +225,82 @@ static struct sun4i_ss_alg_template ss_algs[] = {
 #endif
 };
 
+/*
+ * Power management strategy: The device is suspended unless a TFM exists for
+ * one of the algorithms proposed by this driver.
+ */
+static int sun4i_ss_pm_suspend(struct device *dev)
+{
+	struct sun4i_ss_ctx *ss = dev_get_drvdata(dev);
+
+	if (ss->reset)
+		reset_control_assert(ss->reset);
+
+	clk_disable_unprepare(ss->ssclk);
+	clk_disable_unprepare(ss->busclk);
+	return 0;
+}
+
+static int sun4i_ss_pm_resume(struct device *dev)
+{
+	struct sun4i_ss_ctx *ss = dev_get_drvdata(dev);
+
+	int err;
+
+	err = clk_prepare_enable(ss->busclk);
+	if (err) {
+		dev_err(ss->dev, "Cannot prepare_enable busclk\n");
+		goto err_enable;
+	}
+
+	err = clk_prepare_enable(ss->ssclk);
+	if (err) {
+		dev_err(ss->dev, "Cannot prepare_enable ssclk\n");
+		goto err_enable;
+	}
+
+	if (ss->reset) {
+		err = reset_control_deassert(ss->reset);
+		if (err) {
+			dev_err(ss->dev, "Cannot deassert reset control\n");
+			goto err_enable;
+		}
+	}
+
+	return err;
+err_enable:
+	sun4i_ss_pm_suspend(dev);
+	return err;
+}
+
+const struct dev_pm_ops sun4i_ss_pm_ops = {
+	SET_RUNTIME_PM_OPS(sun4i_ss_pm_suspend, sun4i_ss_pm_resume, NULL)
+};
+
+/*
+ * When power management is enabled, this function enables the PM and set the
+ * device as suspended
+ * When power management is disabled, this function just enables the device
+ */
+static int sun4i_ss_pm_init(struct sun4i_ss_ctx *ss)
+{
+	int err;
+
+	pm_runtime_use_autosuspend(ss->dev);
+	pm_runtime_set_autosuspend_delay(ss->dev, 2000);
+
+	err = pm_runtime_set_suspended(ss->dev);
+	if (err)
+		return err;
+	pm_runtime_enable(ss->dev);
+	return err;
+}
+
+static void sun4i_ss_pm_exit(struct sun4i_ss_ctx *ss)
+{
+	pm_runtime_disable(ss->dev);
+}
+
 static int sun4i_ss_probe(struct platform_device *pdev)
 {
 	u32 v;
@@ -269,18 +347,6 @@ static int sun4i_ss_probe(struct platform_device *pdev)
 		ss->reset = NULL;
 	}
 
-	/* Enable both clocks */
-	err = clk_prepare_enable(ss->busclk);
-	if (err) {
-		dev_err(&pdev->dev, "Cannot prepare_enable busclk\n");
-		return err;
-	}
-	err = clk_prepare_enable(ss->ssclk);
-	if (err) {
-		dev_err(&pdev->dev, "Cannot prepare_enable ssclk\n");
-		goto error_ssclk;
-	}
-
 	/*
 	 * Check that clock have the correct rates given in the datasheet
 	 * Try to set the clock to the maximum allowed
@@ -288,16 +354,7 @@ static int sun4i_ss_probe(struct platform_device *pdev)
 	err = clk_set_rate(ss->ssclk, cr_mod);
 	if (err) {
 		dev_err(&pdev->dev, "Cannot set clock rate to ssclk\n");
-		goto error_clk;
-	}
-
-	/* Deassert reset if we have a reset control */
-	if (ss->reset) {
-		err = reset_control_deassert(ss->reset);
-		if (err) {
-			dev_err(&pdev->dev, "Cannot deassert reset control\n");
-			goto error_clk;
-		}
+		return err;
 	}
 
 	/*
@@ -325,12 +382,26 @@ static int sun4i_ss_probe(struct platform_device *pdev)
 		dev_warn(&pdev->dev, "Clock ss is at %lu (%lu MHz) (must be <= %lu)\n",
 			 cr, cr / 1000000, cr_mod);
 
+	ss->dev = &pdev->dev;
+	platform_set_drvdata(pdev, ss);
+
+	spin_lock_init(&ss->slock);
+
+	err = sun4i_ss_pm_init(ss);
+	if (err)
+		return err;
+
 	/*
 	 * Datasheet named it "Die Bonding ID"
 	 * I expect to be a sort of Security System Revision number.
 	 * Since the A80 seems to have an other version of SS
 	 * this info could be useful
 	 */
+
+	err = pm_runtime_get_sync(ss->dev);
+	if (err < 0)
+		goto error_pm;
+
 	writel(SS_ENABLED, ss->base + SS_CTL);
 	v = readl(ss->base + SS_CTL);
 	v >>= 16;
@@ -338,9 +409,7 @@ static int sun4i_ss_probe(struct platform_device *pdev)
 	dev_info(&pdev->dev, "Die ID %d\n", v);
 	writel(0, ss->base + SS_CTL);
 
-	ss->dev = &pdev->dev;
-
-	spin_lock_init(&ss->slock);
+	pm_runtime_put_sync(ss->dev);
 
 	for (i = 0; i < ARRAY_SIZE(ss_algs); i++) {
 		ss_algs[i].ss = ss;
@@ -370,7 +439,6 @@ static int sun4i_ss_probe(struct platform_device *pdev)
 			break;
 		}
 	}
-	platform_set_drvdata(pdev, ss);
 	return 0;
 error_alg:
 	i--;
@@ -387,12 +455,8 @@ error_alg:
 			break;
 		}
 	}
-	if (ss->reset)
-		reset_control_assert(ss->reset);
-error_clk:
-	clk_disable_unprepare(ss->ssclk);
-error_ssclk:
-	clk_disable_unprepare(ss->busclk);
+error_pm:
+	sun4i_ss_pm_exit(ss);
 	return err;
 }
 
@@ -415,11 +479,7 @@ static int sun4i_ss_remove(struct platform_device *pdev)
 		}
 	}
 
-	writel(0, ss->base + SS_CTL);
-	if (ss->reset)
-		reset_control_assert(ss->reset);
-	clk_disable_unprepare(ss->busclk);
-	clk_disable_unprepare(ss->ssclk);
+	sun4i_ss_pm_exit(ss);
 	return 0;
 }
 
@@ -434,6 +494,7 @@ static struct platform_driver sun4i_ss_driver = {
 	.remove         = sun4i_ss_remove,
 	.driver         = {
 		.name           = "sun4i-ss",
+		.pm		= &sun4i_ss_pm_ops,
 		.of_match_table	= a20ss_crypto_of_match_table,
 	},
 };
