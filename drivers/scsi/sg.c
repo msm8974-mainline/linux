@@ -574,10 +574,7 @@ sg_new_read(Sg_fd * sfp, char __user *buf, size_t count, Sg_request * srp)
 	}
 	if (hp->masked_status || hp->host_status || hp->driver_status)
 		hp->info |= SG_INFO_CHECK;
-	if (copy_to_user(buf, hp, SZ_SG_IO_HDR)) {
-		err = -EFAULT;
-		goto err_out;
-	}
+	err = put_sg_io_hdr(hp, buf);
 err_out:
 	err2 = sg_finish_rem_req(srp);
 	sg_remove_request(sfp, srp);
@@ -718,7 +715,7 @@ sg_new_write(Sg_fd *sfp, struct file *file, const char __user *buf,
 	}
 	srp->sg_io_owned = sg_io_owned;
 	hp = &srp->header;
-	if (copy_from_user(hp, buf, SZ_SG_IO_HDR)) {
+	if (get_sg_io_hdr(hp, buf)) {
 		sg_remove_request(sfp, srp);
 		return -EFAULT;
 	}
@@ -871,6 +868,33 @@ sg_fill_request_table(Sg_fd *sfp, sg_req_info_t *rinfo)
 		val++;
 	}
 }
+
+#ifdef CONFIG_COMPAT
+struct compat_sg_req_info { /* used by SG_GET_REQUEST_TABLE ioctl() */
+	char req_state;
+	char orphan;
+	char sg_io_owned;
+	char problem;
+	int pack_id;
+	compat_uptr_t usr_ptr;
+	unsigned int duration;
+	int unused;
+};
+
+static int put_compat_request_table(struct compat_sg_req_info __user *o,
+				    struct sg_req_info *rinfo)
+{
+	int i;
+	for (i = 0; i < SG_MAX_QUEUE; i++) {
+		if (copy_to_user(o + i, rinfo + i, offsetof(sg_req_info_t, usr_ptr)) ||
+		    put_user((uintptr_t)rinfo[i].usr_ptr, &o[i].usr_ptr) ||
+		    put_user(rinfo[i].duration, &o[i].duration) ||
+		    put_user(rinfo[i].unused, &o[i].unused))
+			return -EFAULT;
+	}
+	return 0;
+}
+#endif
 
 static long
 sg_ioctl(struct file *filp, unsigned int cmd_in, unsigned long arg)
@@ -1051,8 +1075,13 @@ sg_ioctl(struct file *filp, unsigned int cmd_in, unsigned long arg)
 			read_lock_irqsave(&sfp->rq_list_lock, iflags);
 			sg_fill_request_table(sfp, rinfo);
 			read_unlock_irqrestore(&sfp->rq_list_lock, iflags);
-			result = copy_to_user(p, rinfo,
-						SZ_SG_REQ_INFO * SG_MAX_QUEUE);
+	#ifdef CONFIG_COMPAT
+			if (in_compat_syscall())
+				result = put_compat_request_table(p, rinfo);
+			else
+	#endif
+				result = copy_to_user(p, rinfo,
+						      SZ_SG_REQ_INFO * SG_MAX_QUEUE);
 			result = result ? -EFAULT : 0;
 			kfree(rinfo);
 			return result;
@@ -1763,7 +1792,14 @@ sg_start_req(Sg_request *srp, unsigned char *cmd)
 		struct iovec *iov = NULL;
 		struct iov_iter i;
 
-		res = import_iovec(rw, hp->dxferp, iov_count, 0, &iov, &i);
+#ifdef CONFIG_COMPAT
+		if (in_compat_syscall())
+			res = compat_import_iovec(rw, hp->dxferp, iov_count,
+						  0, &iov, &i);
+		else
+#endif
+			res = import_iovec(rw, hp->dxferp, iov_count,
+					   0, &iov, &i);
 		if (res < 0)
 			return res;
 
