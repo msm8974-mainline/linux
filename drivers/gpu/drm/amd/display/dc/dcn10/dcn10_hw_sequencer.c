@@ -49,9 +49,7 @@
 #include "clk_mgr.h"
 
 
-#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 #include "dsc.h"
-#endif
 
 #define DC_LOGGER_INIT(logger)
 
@@ -129,9 +127,8 @@ static void dcn10_log_hubp_states(struct dc *dc, void *log_ctx)
 	struct resource_pool *pool = dc->res_pool;
 	int i;
 
-	DTN_INFO("HUBP:  format  addr_hi  width  height"
-			"  rot  mir  sw_mode  dcc_en  blank_en  ttu_dis  underflow"
-			"   min_ttu_vblank       qos_low_wm      qos_high_wm\n");
+	DTN_INFO(
+		"HUBP:  format  addr_hi  width  height  rot  mir  sw_mode  dcc_en  blank_en  clock_en  ttu_dis  underflow   min_ttu_vblank       qos_low_wm      qos_high_wm\n");
 	for (i = 0; i < pool->pipe_count; i++) {
 		struct hubp *hubp = pool->hubps[i];
 		struct dcn_hubp_state *s = &(TO_DCN10_HUBP(hubp)->state);
@@ -139,8 +136,7 @@ static void dcn10_log_hubp_states(struct dc *dc, void *log_ctx)
 		hubp->funcs->hubp_read_state(hubp);
 
 		if (!s->blank_en) {
-			DTN_INFO("[%2d]:  %5xh  %6xh  %5d  %6d  %2xh  %2xh  %6xh"
-					"  %6d  %8d  %7d  %8xh",
+			DTN_INFO("[%2d]:  %5xh  %6xh  %5d  %6d  %2xh  %2xh  %6xh  %6d  %8d  %8d  %7d  %8xh",
 					hubp->inst,
 					s->pixel_format,
 					s->inuse_addr_hi,
@@ -151,6 +147,7 @@ static void dcn10_log_hubp_states(struct dc *dc, void *log_ctx)
 					s->sw_mode,
 					s->dcc_en,
 					s->blank_en,
+					s->clock_en,
 					s->ttu_disable,
 					s->underflow_status);
 			DTN_INFO_MICRO_SEC(s->min_ttu_vblank);
@@ -308,21 +305,31 @@ void dcn10_log_hw_state(struct dc *dc,
 	}
 	DTN_INFO("\n");
 
-	DTN_INFO("OTG:  v_bs  v_be  v_ss  v_se  vpol  vmax  vmin  vmax_sel  vmin_sel"
-			"  h_bs  h_be  h_ss  h_se  hpol  htot  vtot  underflow\n");
+	DTN_INFO("OTG:  v_bs  v_be  v_ss  v_se  vpol  vmax  vmin  vmax_sel  vmin_sel  h_bs  h_be  h_ss  h_se  hpol  htot  vtot  underflow blank_en\n");
 
 	for (i = 0; i < pool->timing_generator_count; i++) {
 		struct timing_generator *tg = pool->timing_generators[i];
 		struct dcn_otg_state s = {0};
-
+		/* Read shared OTG state registers for all DCNx */
 		optc1_read_otg_state(DCN10TG_FROM_TG(tg), &s);
+
+		/*
+		 * For DCN2 and greater, a register on the OPP is used to
+		 * determine if the CRTC is blanked instead of the OTG. So use
+		 * dpg_is_blanked() if exists, otherwise fallback on otg.
+		 *
+		 * TODO: Implement DCN-specific read_otg_state hooks.
+		 */
+		if (pool->opps[i]->funcs->dpg_is_blanked)
+			s.blank_enabled = pool->opps[i]->funcs->dpg_is_blanked(pool->opps[i]);
+		else
+			s.blank_enabled = tg->funcs->is_blanked(tg);
 
 		//only print if OTG master is enabled
 		if ((s.otg_enabled & 1) == 0)
 			continue;
 
-		DTN_INFO("[%d]: %5d %5d %5d %5d %5d %5d %5d %9d %9d %5d %5d %5d"
-				" %5d %5d %5d %5d  %9d\n",
+		DTN_INFO("[%d]: %5d %5d %5d %5d %5d %5d %5d %9d %9d %5d %5d %5d %5d %5d %5d %5d  %9d %8d\n",
 				tg->inst,
 				s.v_blank_start,
 				s.v_blank_end,
@@ -340,7 +347,8 @@ void dcn10_log_hw_state(struct dc *dc,
 				s.h_sync_a_pol,
 				s.h_total,
 				s.v_total,
-				s.underflow_occurred_status);
+				s.underflow_occurred_status,
+				s.blank_enabled);
 
 		// Clear underflow for debug purposes
 		// We want to keep underflow sticky bit on for the longevity tests outside of test environment.
@@ -350,7 +358,6 @@ void dcn10_log_hw_state(struct dc *dc,
 	}
 	DTN_INFO("\n");
 
-#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 	DTN_INFO("DSC: CLOCK_EN  SLICE_WIDTH  Bytes_pp\n");
 	for (i = 0; i < pool->res_cap->num_dsc; i++) {
 		struct display_stream_compressor *dsc = pool->dscs[i];
@@ -387,7 +394,7 @@ void dcn10_log_hw_state(struct dc *dc,
 	}
 	DTN_INFO("\n");
 
-	DTN_INFO("L_ENC: DPHY_FEC_EN  DPHY_FEC_READY_SHADOW  DPHY_FEC_ACTIVE_STATUS\n");
+	DTN_INFO("L_ENC: DPHY_FEC_EN  DPHY_FEC_READY_SHADOW  DPHY_FEC_ACTIVE_STATUS  DP_LINK_TRAINING_COMPLETE\n");
 	for (i = 0; i < dc->link_count; i++) {
 		struct link_encoder *lenc = dc->links[i]->link_enc;
 
@@ -395,16 +402,16 @@ void dcn10_log_hw_state(struct dc *dc,
 
 		if (lenc->funcs->read_state) {
 			lenc->funcs->read_state(lenc, &s);
-			DTN_INFO("[%-3d]: %-12d %-22d %-22d\n",
+			DTN_INFO("[%-3d]: %-12d %-22d %-22d %-25d\n",
 				i,
 				s.dphy_fec_en,
 				s.dphy_fec_ready_shadow,
-				s.dphy_fec_active_status);
+				s.dphy_fec_active_status,
+				s.dp_link_training_complete);
 			DTN_INFO("\n");
 		}
 	}
 	DTN_INFO("\n");
-#endif
 
 	DTN_INFO("\nCALCULATED Clocks: dcfclk_khz:%d  dcfclk_deep_sleep_khz:%d  dispclk_khz:%d\n"
 		"dppclk_khz:%d  max_supported_dppclk_khz:%d  fclk_khz:%d  socclk_khz:%d\n\n",
@@ -670,10 +677,8 @@ static void dcn10_bios_golden_init(struct dc *dc)
 	int i;
 	bool allow_self_fresh_force_enable = true;
 
-#if defined(CONFIG_DRM_AMD_DC_DCN2_1)
 	if (dc->hwss.s0i3_golden_init_wa && dc->hwss.s0i3_golden_init_wa(dc))
 		return;
-#endif
 	if (dc->res_pool->hubbub->funcs->is_allow_self_refresh_enabled)
 		allow_self_fresh_force_enable =
 				dc->res_pool->hubbub->funcs->is_allow_self_refresh_enabled(dc->res_pool->hubbub);
@@ -1258,11 +1263,9 @@ static void dcn10_init_hw(struct dc *dc)
 	}
 
 	/* Power gate DSCs */
-#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 	for (i = 0; i < res_pool->res_cap->num_dsc; i++)
 		if (dc->hwss.dsc_pg_control != NULL)
 			dc->hwss.dsc_pg_control(hws, res_pool->dscs[i]->inst, false);
-#endif
 
 	/* If taking control over from VBIOS, we may want to optimize our first
 	 * mode set, so we need to skip powering down pipes until we know which
@@ -1285,7 +1288,7 @@ static void dcn10_init_hw(struct dc *dc)
 		abm->funcs->abm_init(abm);
 	}
 
-	if (dmcu != NULL)
+	if (dmcu != NULL && !dmcu->auto_load_dmcu)
 		dmcu->funcs->dmcu_init(dmcu);
 
 	if (abm != NULL && dmcu != NULL)
@@ -2175,12 +2178,8 @@ static void update_dpp(struct dpp *dpp, struct dc_plane_state *plane_state)
 			plane_state->format,
 			EXPANSION_MODE_ZERO,
 			plane_state->input_csc_color_matrix,
-#ifdef CONFIG_DRM_AMD_DC_DCN2_0
 			plane_state->color_space,
 			NULL);
-#else
-			plane_state->color_space);
-#endif
 
 	//set scale and bias registers
 	dcn10_build_prescale_params(&bns_params, plane_state);
@@ -2634,11 +2633,9 @@ static void dcn10_apply_ctx_for_surface(
 	if (num_planes > 0)
 		program_all_pipe_in_tree(dc, top_pipe_to_program, context);
 
-#if defined(CONFIG_DRM_AMD_DC_DCN2_0)
 	/* Program secondary blending tree and writeback pipes */
 	if ((stream->num_wb_info > 0) && (dc->hwss.program_all_writeback_pipes_in_tree))
 		dc->hwss.program_all_writeback_pipes_in_tree(dc, stream, context);
-#endif
 	if (interdependent_update)
 		for (i = 0; i < dc->res_pool->pipe_count; i++) {
 			struct pipe_ctx *pipe_ctx = &context->res_ctx.pipe_ctx[i];

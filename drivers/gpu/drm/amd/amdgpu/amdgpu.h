@@ -89,6 +89,7 @@
 #include "amdgpu_mes.h"
 #include "amdgpu_umc.h"
 #include "amdgpu_mmhub.h"
+#include "amdgpu_tmz.h"
 
 #define MAX_GPU_INSTANCE		16
 
@@ -174,6 +175,8 @@ extern int sched_policy;
 #else
 static const int sched_policy = KFD_SCHED_POLICY_HWS;
 #endif
+
+extern int amdgpu_tmz;
 
 #ifdef CONFIG_DRM_AMDGPU_SI
 extern int amdgpu_si_support;
@@ -924,6 +927,9 @@ struct amdgpu_device {
 	bool                            enable_mes;
 	struct amdgpu_mes               mes;
 
+	/* tmz */
+	struct amdgpu_tmz		tmz;
+
 	struct amdgpu_ip_block          ip_blocks[AMDGPU_MAX_IP_NUM];
 	int				num_ip_blocks;
 	struct mutex	mn_lock;
@@ -935,7 +941,7 @@ struct amdgpu_device {
 	atomic64_t gart_pin_size;
 
 	/* soc15 register offset based on ip, instance and  segment */
-	uint32_t 		*reg_offset[MAX_HWIP][HWIP_MAX_INSTANCE];
+	uint32_t		*reg_offset[MAX_HWIP][HWIP_MAX_INSTANCE];
 
 	const struct amdgpu_df_funcs	*df_funcs;
 
@@ -977,6 +983,9 @@ struct amdgpu_device {
 
 	uint64_t			unique_id;
 	uint64_t	df_perfmon_config_assign_mask[AMDGPU_MAX_DF_PERFMONS];
+
+	/* device pstate */
+	int				pstate;
 };
 
 static inline struct amdgpu_device *amdgpu_ttm_adev(struct ttm_bo_device *bdev)

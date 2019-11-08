@@ -88,11 +88,7 @@ struct _vcs_dpi_ip_params_st dcn2_1_ip = {
 	.gpuvm_max_page_table_levels = 1,
 	.hostvm_max_page_table_levels = 4,
 	.hostvm_cached_page_table_levels = 2,
-#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 	.num_dsc = 3,
-#else
-	.num_dsc = 0,
-#endif
 	.rob_buffer_size_kbytes = 168,
 	.det_buffer_size_kbytes = 164,
 	.dpte_buffer_size_in_pte_reqs_luma = 44,
@@ -350,7 +346,7 @@ static const struct bios_registers bios_regs = {
 };
 
 static const struct dce_dmcu_registers dmcu_regs = {
-		DMCU_DCN10_REG_LIST()
+		DMCU_DCN20_REG_LIST()
 };
 
 static const struct dce_dmcu_shift dmcu_shift = {
@@ -372,20 +368,6 @@ static const struct dce_abm_shift abm_shift = {
 static const struct dce_abm_mask abm_mask = {
 		ABM_MASK_SH_LIST_DCN20(_MASK)
 };
-
-#ifdef CONFIG_DRM_AMD_DC_DMUB
-static const struct dcn21_dmcub_registers dmcub_regs = {
-		DMCUB_REG_LIST_DCN()
-};
-
-static const struct dcn21_dmcub_shift dmcub_shift = {
-		DMCUB_COMMON_MASK_SH_LIST_BASE(__SHIFT)
-};
-
-static const struct dcn21_dmcub_mask dmcub_mask = {
-		DMCUB_COMMON_MASK_SH_LIST_BASE(_MASK)
-};
-#endif
 
 #define audio_regs(id)\
 [id] = {\
@@ -552,7 +534,6 @@ static const struct dcn20_vmid_mask vmid_masks = {
 		DCN20_VMID_MASK_SH_LIST(_MASK)
 };
 
-#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 #define dsc_regsDCN20(id)\
 [id] = {\
 	DSC_REG_LIST_DCN20(id)\
@@ -574,7 +555,6 @@ static const struct dcn20_dsc_shift dsc_shift = {
 static const struct dcn20_dsc_mask dsc_mask = {
 	DSC_REG_LIST_SH_MASK_DCN20(_MASK)
 };
-#endif
 
 #define ipp_regs(id)\
 [id] = {\
@@ -771,9 +751,7 @@ static const struct resource_caps res_cap_rn = {
 		.num_dwb = 1,
 		.num_ddc = 5,
 		.num_vmid = 1,
-#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 		.num_dsc = 3,
-#endif
 };
 
 #ifdef DIAGS_BUILD
@@ -798,9 +776,7 @@ static const struct resource_caps res_cap_rn_FPGA_2pipe_dsc = {
 		.num_pll = 4,
 		.num_dwb = 1,
 		.num_ddc = 4,
-#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 		.num_dsc = 2,
-#endif
 };
 #endif
 
@@ -845,6 +821,7 @@ static const struct dc_debug_options debug_defaults_drv = {
 		.scl_reset_length10 = true,
 		.sanity_checks = true,
 		.disable_48mhz_pwrdwn = false,
+		.nv12_iflip_vm_wa = true
 };
 
 static const struct dc_debug_options debug_defaults_diags = {
@@ -878,12 +855,10 @@ static void destruct(struct dcn21_resource_pool *pool)
 		}
 	}
 
-#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 	for (i = 0; i < pool->base.res_cap->num_dsc; i++) {
 		if (pool->base.dscs[i] != NULL)
 			dcn20_dsc_destroy(&pool->base.dscs[i]);
 	}
-#endif
 
 	if (pool->base.mpc != NULL) {
 		kfree(TO_DCN20_MPC(pool->base.mpc));
@@ -970,11 +945,6 @@ static void destruct(struct dcn21_resource_pool *pool)
 	if (pool->base.dmcu != NULL)
 		dce_dmcu_destroy(&pool->base.dmcu);
 
-#ifdef CONFIG_DRM_AMD_DC_DMUB
-	if (pool->base.dmcub != NULL)
-		dcn21_dmcub_destroy(&pool->base.dmcub);
-#endif
-
 	if (pool->base.dccg != NULL)
 		dcn_dccg_destroy(&pool->base.dccg);
 
@@ -1006,11 +976,9 @@ static void calculate_wm_set_for_vlevel(
 	wm_set->cstate_pstate.cstate_exit_ns = get_wm_stutter_exit(dml, pipes, pipe_cnt) * 1000;
 	wm_set->cstate_pstate.pstate_change_ns = get_wm_dram_clock_change(dml, pipes, pipe_cnt) * 1000;
 	wm_set->pte_meta_urgent_ns = get_wm_memory_trip(dml, pipes, pipe_cnt) * 1000;
-#if defined(CONFIG_DRM_AMD_DC_DCN2_1)
 	wm_set->frac_urg_bw_nom = get_fraction_of_urgent_bandwidth(dml, pipes, pipe_cnt) * 1000;
 	wm_set->frac_urg_bw_flip = get_fraction_of_urgent_bandwidth_imm_flip(dml, pipes, pipe_cnt) * 1000;
 	wm_set->urgent_latency_ns = get_urgent_latency(dml, pipes, pipe_cnt) * 1000;
-#endif
 	dml->soc.dram_clock_change_latency_us = dram_clock_change_latency_cached;
 
 }
@@ -1317,7 +1285,6 @@ static void read_dce_straps(
 
 }
 
-#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 
 struct display_stream_compressor *dcn21_dsc_create(
 	struct dc_context *ctx, uint32_t inst)
@@ -1333,7 +1300,6 @@ struct display_stream_compressor *dcn21_dsc_create(
 	dsc2_construct(dsc, ctx, inst, &dsc_regs[inst], &dsc_shift, &dsc_mask);
 	return &dsc->base;
 }
-#endif
 
 static void update_bw_bounding_box(struct dc *dc, struct clk_bw_params *bw_params)
 {
@@ -1697,6 +1663,7 @@ static bool construct(
 	dc->caps.post_blend_color_processing = true;
 	dc->caps.force_dp_tps4_for_cp2520 = true;
 	dc->caps.extended_aux_timeout_support = true;
+	dc->caps.dmcub_support = true;
 
 	if (dc->ctx->dce_environment == DCE_ENV_PRODUCTION_DRV)
 		dc->debug = debug_defaults_drv;
@@ -1746,7 +1713,7 @@ static bool construct(
 		goto create_fail;
 	}
 
-	pool->base.dmcu = dcn20_dmcu_create(ctx,
+	pool->base.dmcu = dcn21_dmcu_create(ctx,
 			&dmcu_regs,
 			&dmcu_shift,
 			&dmcu_mask);
@@ -1765,18 +1732,6 @@ static bool construct(
 		BREAK_TO_DEBUGGER();
 		goto create_fail;
 	}
-
-#ifdef CONFIG_DRM_AMD_DC_DMUB
-	pool->base.dmcub = dcn21_dmcub_create(ctx,
-			&dmcub_regs,
-			&dmcub_shift,
-			&dmcub_mask);
-	if (pool->base.dmcub == NULL) {
-		dm_error("DC: failed to create dmcub!\n");
-		BREAK_TO_DEBUGGER();
-		goto create_fail;
-	}
-#endif
 
 	pool->base.pp_smu = dcn21_pp_smu_create(ctx);
 
@@ -1882,7 +1837,6 @@ static bool construct(
 		goto create_fail;
 	}
 
-#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 	for (i = 0; i < pool->base.res_cap->num_dsc; i++) {
 		pool->base.dscs[i] = dcn21_dsc_create(ctx, i);
 		if (pool->base.dscs[i] == NULL) {
@@ -1891,7 +1845,6 @@ static bool construct(
 			goto create_fail;
 		}
 	}
-#endif
 
 	if (!dcn20_dwbc_create(ctx, &pool->base)) {
 		BREAK_TO_DEBUGGER();

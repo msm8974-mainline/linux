@@ -206,7 +206,10 @@ static void construct(
 		ddc_service->ddc_pin = NULL;
 	} else {
 		hw_info.ddc_channel = i2c_info.i2c_line;
-		hw_info.hw_supported = i2c_info.i2c_hw_assist;
+		if (ddc_service->link != NULL)
+			hw_info.hw_supported = i2c_info.i2c_hw_assist;
+		else
+			hw_info.hw_supported = false;
 
 		ddc_service->ddc_pin = dal_gpio_create_ddc(
 			gpio_service,
@@ -647,17 +650,16 @@ bool dc_link_aux_transfer_with_retries(struct ddc_service *ddc,
 }
 
 
-enum dc_status dc_link_aux_configure_timeout(struct ddc_service *ddc,
+uint32_t dc_link_aux_configure_timeout(struct ddc_service *ddc,
 		uint32_t timeout)
 {
-	enum dc_status status = DC_OK;
+	uint32_t prev_timeout = 0;
 	struct ddc *ddc_pin = ddc->ddc_pin;
 
-	if (ddc->ctx->dc->res_pool->engines[ddc_pin->pin_data->en]->funcs->configure_timeout == NULL)
-		return DC_ERROR_UNEXPECTED;
-	if (!ddc->ctx->dc->res_pool->engines[ddc_pin->pin_data->en]->funcs->configure_timeout(ddc, timeout))
-		status = DC_ERROR_UNEXPECTED;
-	return status;
+	if (ddc->ctx->dc->res_pool->engines[ddc_pin->pin_data->en]->funcs->configure_timeout)
+		prev_timeout =
+				ddc->ctx->dc->res_pool->engines[ddc_pin->pin_data->en]->funcs->configure_timeout(ddc, timeout);
+	return prev_timeout;
 }
 
 /*test only function*/
