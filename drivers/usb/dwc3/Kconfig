@@ -104,7 +104,7 @@ config USB_DWC3_MESON_G12A
        select USB_ROLE_SWITCH
 	select REGMAP_MMIO
        help
-         Support USB2/3 functionality in Amlogic G12A platforms.
+	 Support USB2/3 functionality in Amlogic G12A platforms.
 	 Say 'Y' or 'M' if you have one such device.
 
 config USB_DWC3_OF_SIMPLE
@@ -112,7 +112,7 @@ config USB_DWC3_OF_SIMPLE
        depends on OF && COMMON_CLK
        default USB_DWC3
        help
-         Support USB2/3 functionality in simple SoC integrations.
+	 Support USB2/3 functionality in simple SoC integrations.
 	 Currently supports Xilinx and Qualcomm DWC USB3 IP.
 	 Say 'Y' or 'M' if you have one such device.
 
