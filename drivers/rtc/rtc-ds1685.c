@@ -31,7 +31,10 @@
 
 
 /* ----------------------------------------------------------------------- */
-/* Standard read/write functions if platform does not provide overrides */
+/*
+ *  Standard read/write
+ *  all registers are mapped in CPU address space
+ */
 
 /**
  * ds1685_read - read a value from an rtc register.
@@ -59,6 +62,35 @@ ds1685_write(struct ds1685_priv *rtc, int reg, u8 value)
 }
 /* ----------------------------------------------------------------------- */
 
+/*
+ * Indirect read/write functions
+ * access happens via address and data register mapped in CPU address space
+ */
+
+/**
+ * ds1685_indirect_read - read a value from an rtc register.
+ * @rtc: pointer to the ds1685 rtc structure.
+ * @reg: the register address to read.
+ */
+static u8
+ds1685_indirect_read(struct ds1685_priv *rtc, int reg)
+{
+	writeb(reg, rtc->regs);
+	return readb(rtc->data);
+}
+
+/**
+ * ds1685_indirect_write - write a value to an rtc register.
+ * @rtc: pointer to the ds1685 rtc structure.
+ * @reg: the register address to write.
+ * @value: value to write to the register.
+ */
+static void
+ds1685_indirect_write(struct ds1685_priv *rtc, int reg, u8 value)
+{
+	writeb(reg, rtc->regs);
+	writeb(value, rtc->data);
+}
 
 /* ----------------------------------------------------------------------- */
 /* Inlined functions */
@@ -1040,7 +1072,6 @@ static int
 ds1685_rtc_probe(struct platform_device *pdev)
 {
 	struct rtc_device *rtc_dev;
-	struct resource *res;
 	struct ds1685_priv *rtc;
 	struct ds1685_rtc_platform_data *pdata;
 	u8 ctrla, ctrlb, hours;
@@ -1063,59 +1094,35 @@ ds1685_rtc_probe(struct platform_device *pdev)
 	if (!rtc)
 		return -ENOMEM;
 
-	/*
-	 * Allocate/setup any IORESOURCE_MEM resources, if required.  Not all
-	 * platforms put the RTC in an easy-access place.  Like the SGI Octane,
-	 * which attaches the RTC to a "ByteBus", hooked to a SuperIO chip
-	 * that sits behind the IOC3 PCI metadevice.
-	 */
-	if (pdata->alloc_io_resources) {
-		/* Get the platform resources. */
-		res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-		if (!res)
-			return -ENXIO;
-		rtc->size = resource_size(res);
-
-		/* Request a memory region. */
-		/* XXX: mmio-only for now. */
-		if (!devm_request_mem_region(&pdev->dev, res->start, rtc->size,
-					     pdev->name))
-			return -EBUSY;
-
-		/*
-		 * Set the base address for the rtc, and ioremap its
-		 * registers.
-		 */
-		rtc->baseaddr = res->start;
-		rtc->regs = devm_ioremap(&pdev->dev, res->start, rtc->size);
-		if (!rtc->regs)
-			return -ENOMEM;
+	/* Setup resources and access functions */
+	switch (pdata->access_type) {
+	case ds1685_reg_direct:
+		rtc->regs = devm_platform_ioremap_resource(pdev, 0);
+		if (IS_ERR(rtc->regs))
+			return PTR_ERR(rtc->regs);
+		rtc->read = ds1685_read;
+		rtc->write = ds1685_write;
+		break;
+	case ds1685_reg_indirect:
+		rtc->regs = devm_platform_ioremap_resource(pdev, 0);
+		if (IS_ERR(rtc->regs))
+			return PTR_ERR(rtc->regs);
+		rtc->data = devm_platform_ioremap_resource(pdev, 1);
+		if (IS_ERR(rtc->data))
+			return PTR_ERR(rtc->data);
+		rtc->read = ds1685_indirect_read;
+		rtc->write = ds1685_indirect_write;
+		break;
 	}
-	rtc->alloc_io_resources = pdata->alloc_io_resources;
+
+	if (!rtc->read || !rtc->write)
+		return -ENXIO;
 
 	/* Get the register step size. */
 	if (pdata->regstep > 0)
 		rtc->regstep = pdata->regstep;
 	else
 		rtc->regstep = 1;
-
-	/* Platform read function, else default if mmio setup */
-	if (pdata->plat_read)
-		rtc->read = pdata->plat_read;
-	else
-		if (pdata->alloc_io_resources)
-			rtc->read = ds1685_read;
-		else
-			return -ENXIO;
-
-	/* Platform write function, else default if mmio setup */
-	if (pdata->plat_write)
-		rtc->write = pdata->plat_write;
-	else
-		if (pdata->alloc_io_resources)
-			rtc->write = ds1685_write;
-		else
-			return -ENXIO;
 
 	/* Platform pre-shutdown function, if defined. */
 	if (pdata->plat_prepare_poweroff)
@@ -1271,7 +1278,6 @@ ds1685_rtc_probe(struct platform_device *pdev)
 	/* See if the platform doesn't support UIE. */
 	if (pdata->uie_unsupported)
 		rtc_dev->uie_unsupported = 1;
-	rtc->uie_unsupported = pdata->uie_unsupported;
 
 	rtc->dev = rtc_dev;
 
