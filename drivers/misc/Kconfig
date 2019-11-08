@@ -21,7 +21,6 @@ config WATCH_QUEUE
 config SENSORS_LIS3LV02D
 	tristate
 	depends on INPUT
-	select INPUT_POLLDEV
 
 config AD525X_DPOT
 	tristate "Analog Devices Digital Potentiometers"
