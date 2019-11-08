@@ -535,6 +535,18 @@ static struct platform_driver qcs404_noc_driver = {
 		.of_match_table = qcs404_noc_of_match,
 	},
 };
-module_platform_driver(qcs404_noc_driver);
+
+static int __init qcs404_noc_driver_init(void)
+{
+	return platform_driver_register(&qcs404_noc_driver);
+}
+core_initcall(qcs404_noc_driver_init);
+
+static void __exit qcs404_noc_driver_exit(void)
+{
+	platform_driver_unregister(&qcs404_noc_driver);
+}
+module_exit(qcs404_noc_driver_exit);
+
 MODULE_DESCRIPTION("Qualcomm QCS404 NoC driver");
 MODULE_LICENSE("GPL v2");
