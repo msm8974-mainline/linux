@@ -183,11 +183,17 @@ int wilc_get_vif_idx(struct wilc_vif *vif)
 static struct wilc_vif *wilc_get_vif_from_idx(struct wilc *wilc, int idx)
 {
 	int index = idx - 1;
+	struct wilc_vif *vif;
 
 	if (index < 0 || index >= WILC_NUM_CONCURRENT_IFC)
 		return NULL;
 
-	return wilc->vif[index];
+	list_for_each_entry_rcu(vif, &wilc->vif_list, list) {
+		if (vif->idx == index)
+			return vif;
+	}
+
+	return NULL;
 }
 
 static int handle_scan_done(struct wilc_vif *vif, enum scan_event evt)
@@ -473,6 +479,8 @@ void *wilc_parse_join_bss_param(struct cfg80211_bss *bss,
 	rates_ie = cfg80211_find_ie(WLAN_EID_SUPP_RATES, ies->data, ies->len);
 	if (rates_ie) {
 		rates_len = rates_ie[1];
+		if (rates_len > WILC_MAX_RATES_SUPPORTED)
+			rates_len = WILC_MAX_RATES_SUPPORTED;
 		param->supp_rates[0] = rates_len;
 		memcpy(&param->supp_rates[1], rates_ie + 2, rates_len);
 	}

@@ -355,7 +355,7 @@ mark_service_closing(struct vchiq_service *service)
 }
 
 static inline VCHIQ_STATUS_T
-make_service_callback(struct vchiq_service *service, VCHIQ_REASON_T reason,
+make_service_callback(struct vchiq_service *service, enum vchiq_reason reason,
 		      struct vchiq_header *header, void *bulk_userdata)
 {
 	VCHIQ_STATUS_T status;
@@ -542,7 +542,7 @@ reserve_space(struct vchiq_state *state, size_t space, int is_blocking)
 	if (space > slot_space) {
 		struct vchiq_header *header;
 		/* Fill the remaining space with padding */
-		WARN_ON(state->tx_data == NULL);
+		WARN_ON(!state->tx_data);
 		header = (struct vchiq_header *)
 			(state->tx_data + (tx_pos & VCHIQ_SLOT_MASK));
 		header->msgid = VCHIQ_MSGID_PADDING;
@@ -1230,7 +1230,7 @@ notify_bulks(struct vchiq_service *service, struct vchiq_bulk_queue *queue,
 					spin_unlock(&bulk_waiter_spinlock);
 				} else if (bulk->mode ==
 					VCHIQ_BULK_MODE_CALLBACK) {
-					VCHIQ_REASON_T reason = (bulk->dir ==
+					enum vchiq_reason reason = (bulk->dir ==
 						VCHIQ_BULK_TRANSMIT) ?
 						((bulk->actual ==
 						VCHIQ_BULK_ACTUAL_ABORTED) ?
@@ -2131,9 +2131,6 @@ vchiq_init_state(struct vchiq_state *state, struct vchiq_slot_zero *slot_zero)
 	VCHIQ_STATUS_T status;
 	char threadname[16];
 	int i;
-
-	vchiq_log_warning(vchiq_core_log_level,
-		"%s: slot_zero = %pK", __func__, slot_zero);
 
 	if (vchiq_states[0]) {
 		pr_err("%s: VCHIQ state already initialized\n", __func__);
@@ -3578,7 +3575,7 @@ void vchiq_log_dump_mem(const char *label, u32 addr, const void *void_mem,
 		}
 		*s++ = '\0';
 
-		if ((label != NULL) && (*label != '\0'))
+		if (label && (*label != '\0'))
 			vchiq_log_trace(VCHIQ_LOG_TRACE,
 				"%s: %08x: %s", label, addr, line_buf);
 		else

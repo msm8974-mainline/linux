@@ -214,18 +214,10 @@ static inline u16 get_row_index(u16 i)
 #define FFS_NOTMOUNTED          4
 #define FFS_ALIGNMENTERR        5
 #define FFS_SEMAPHOREERR        6
-#define FFS_INVALIDPATH         7
 #define FFS_INVALIDFID          8
-#define FFS_NOTFOUND            9
-#define FFS_FILEEXIST           10
-#define FFS_PERMISSIONERR       11
 #define FFS_NOTOPENED           12
 #define FFS_MAXOPENED           13
-#define FFS_FULL                14
 #define FFS_EOF                 15
-#define FFS_DIRBUSY             16
-#define FFS_MEMORYERR           17
-#define FFS_NAMETOOLONG		18
 #define FFS_ERROR               19
 
 #define NUM_UPCASE              2918
@@ -618,7 +610,7 @@ struct fs_info_t {
 	u32 dev_ejected;	/* block device operation error flag */
 
 	struct fs_func *fs_func;
-	struct semaphore v_sem;
+	struct mutex v_mutex;
 
 	/* FAT cache */
 	struct buf_cache_t FAT_cache_array[FAT_CACHE_SIZE];

@@ -90,7 +90,7 @@ static int bcm2835_audio_send_simple(struct bcm2835_audio_instance *instance,
 }
 
 static void audio_vchi_callback(void *param,
-				const VCHI_CALLBACK_REASON_T reason,
+				const enum vchi_callback_reason reason,
 				void *msg_handle)
 {
 	struct bcm2835_audio_instance *instance = param;
@@ -103,6 +103,9 @@ static void audio_vchi_callback(void *param,
 
 	status = vchi_msg_dequeue(instance->vchi_handle,
 				  &m, sizeof(m), &msg_len, VCHI_FLAGS_NONE);
+	if (status)
+		return;
+
 	if (m.type == VC_AUDIO_MSG_TYPE_RESULT) {
 		instance->result = m.result.success;
 		complete(&instance->msg_avail_comp);
