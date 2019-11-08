@@ -142,7 +142,7 @@ to_emmap(struct rdma_user_mmap_entry *rdma_entry)
 }
 
 #define field_avail(x, fld, sz) (offsetof(typeof(x), fld) + \
-				 FIELD_SIZEOF(typeof(x), fld) <= (sz))
+				 sizeof_member(typeof(x), fld) <= (sz))
 
 #define is_reserved_cleared(reserved) \
 	!memchr_inv(reserved, 0, sizeof(reserved))
