@@ -187,14 +187,7 @@ static bool start_signal_needed(struct mdp5_ctl *ctl,
 	if (!ctl->encoder_enabled)
 		return false;
 
-	switch (intf->type) {
-	case INTF_WB:
-		return true;
-	case INTF_DSI:
-		return intf->mode == MDP5_INTF_DSI_MODE_COMMAND;
-	default:
-		return false;
-	}
+	return intf->type == INTF_WB;
 }
 
 /*
