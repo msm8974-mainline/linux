@@ -235,6 +235,21 @@
 		pinctrl-names = "default";
 		pinctrl-0 = <&wlan_regulator_pin>;
 	};
+
+	vibrator {
+		compatible = "clk-vibrator";
+
+		vcc-supply = <&pm8941_l19>;
+
+		clocks = <&mmcc CAMSS_GP1_CLK>;
+		clock-names = "core";
+		clock-frequency = <24000>;
+
+		enable-gpios = <&msmgpio 60 GPIO_ACTIVE_HIGH>;
+
+		pinctrl-names = "default";
+		pinctrl-0 = <&vibrator_pin>;
+	};
 };
 
 &soc {
@@ -405,6 +420,21 @@
 
 				drive-strength = <2>;
 				bias-disable;
+			};
+		};
+
+		vibrator_pin: vibrator {
+			core {
+				pins = "gpio27";
+				function = "gp1_clk";
+
+				drive-strength = <6>;
+				bias-disable;
+			};
+
+			enable {
+				pins = "gpio60";
+				function = "gpio";
 			};
 		};
 	};
