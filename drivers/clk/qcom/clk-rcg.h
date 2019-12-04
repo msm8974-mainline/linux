@@ -139,6 +139,8 @@ extern const struct clk_ops clk_dyn_rcg_ops;
  * @freq_tbl: frequency table
  * @clkr: regmap clock handle
  * @cfg_off: defines the cfg register offset from the CMD_RCGR + CFG_REG
+ * @duty_cycle_num: Numerator of the duty cycle ratio
+ * @duty_cycle_den: Denominator of the duty cycle ratio
  */
 struct clk_rcg2 {
 	u32			cmd_rcgr;
@@ -149,6 +151,8 @@ struct clk_rcg2 {
 	const struct freq_tbl	*freq_tbl;
 	struct clk_regmap	clkr;
 	u8			cfg_off;
+	int			duty_cycle_num;
+	int			duty_cycle_den;
 };
 
 #define to_clk_rcg2(_hw) container_of(to_clk_regmap(_hw), struct clk_rcg2, clkr)
