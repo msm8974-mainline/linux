@@ -424,6 +424,16 @@ config INPUT_YEALINK
 	  To compile this driver as a module, choose M here: the module will be
 	  called yealink.
 
+config INPUT_CLK_VIBRATOR
+	tristate "Clock vibrator driver"
+	select INPUT_FF_MEMLESS
+	help
+	  Support for clock-based vibrator devices where the speed can be
+	  controlled by changing the duty cycle.
+
+	  To compile this driver as a module, choose M here: the module
+	  will be called clk_vibrator.
+
 config INPUT_CM109
 	tristate "C-Media CM109 USB I/O Controller"
 	depends on USB_ARCH_HAS_HCD
