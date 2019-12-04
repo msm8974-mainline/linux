@@ -1,0 +1,60 @@
+# SPDX-License-Identifier: (GPL-2.0 OR BSD-2-Clause)
+%YAML 1.2
+---
+$id: http://devicetree.org/schemas/bindings/input/clk-vibrator.yaml#
+$schema: http://devicetree.org/meta-schemas/core.yaml#
+
+title: Clock vibrator
+
+maintainers:
+  - Brian Masney <masneyb@onstation.org>
+
+description: |
+  Support for clock-based vibrator devices where the speed can be controlled
+  by changing the duty cycle.
+
+properties:
+  compatible:
+    const: clk-vibrator
+
+  clocks:
+    maxItems: 1
+
+  clock-names:
+    description: output clock that controls the speed
+    items:
+      - const: core
+
+  clock-frequency: true
+
+  enable-gpios:
+    maxItems: 1
+
+  vcc-supply:
+    description: Regulator that provides power
+
+required:
+  - compatible
+  - clocks
+  - clock-names
+  - clock-frequency
+
+examples:
+  - |
+    #include <dt-bindings/clock/qcom,mmcc-msm8974.h>
+    #include <dt-bindings/gpio/gpio.h>
+
+    vibrator {
+        compatible = "clk-vibrator";
+
+        vcc-supply = <&pm8941_l19>;
+
+        clocks = <&mmcc CAMSS_GP1_CLK>;
+        clock-names = "core";
+        clock-frequency = <24000>;
+
+        enable-gpios = <&msmgpio 60 GPIO_ACTIVE_HIGH>;
+
+        pinctrl-names = "default";
+        pinctrl-0 = <&vibrator_pin>;
+    };
