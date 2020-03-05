@@ -1658,7 +1658,8 @@ static u32 _dpu_encoder_calculate_linetime(struct dpu_encoder_virt *dpu_enc,
 	return line_time;
 }
 
-int dpu_encoder_vsync_time(struct drm_encoder *drm_enc, ktime_t *wakeup_time)
+static int _dpu_encoder_wakeup_time(struct drm_encoder *drm_enc,
+		ktime_t *wakeup_time)
 {
 	struct drm_display_mode *mode;
 	struct dpu_encoder_virt *dpu_enc;
@@ -1744,7 +1745,7 @@ static void dpu_encoder_vsync_event_work_handler(struct kthread_work *work)
 		return;
 	}
 
-	if (dpu_encoder_vsync_time(&dpu_enc->base, &wakeup_time))
+	if (_dpu_encoder_wakeup_time(&dpu_enc->base, &wakeup_time))
 		return;
 
 	trace_dpu_enc_vsync_event_work(DRMID(&dpu_enc->base), wakeup_time);
@@ -1816,7 +1817,7 @@ void dpu_encoder_kickoff(struct drm_encoder *drm_enc)
 	}
 
 	if (dpu_enc->disp_info.intf_type == DRM_MODE_ENCODER_DSI &&
-			!dpu_encoder_vsync_time(drm_enc, &wakeup_time)) {
+			!_dpu_encoder_wakeup_time(drm_enc, &wakeup_time)) {
 		trace_dpu_enc_early_kickoff(DRMID(drm_enc),
 					    ktime_to_ms(wakeup_time));
 		mod_timer(&dpu_enc->vsync_event_timer,
