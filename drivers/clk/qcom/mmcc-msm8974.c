@@ -2150,11 +2150,11 @@ static struct clk_branch mmss_s0_axi_clk = {
 		.hw.init = &(struct clk_init_data){
 			.name = "mmss_s0_axi_clk",
 			.parent_names = (const char *[]){
-				"mmss_axi_clk_src",
+				"mmss_mmssnoc_axi_clk",
 			},
 			.num_parents = 1,
 			.ops = &clk_branch2_ops,
-			.flags = CLK_IGNORE_UNUSED,
+			.flags = CLK_SET_RATE_PARENT | CLK_IGNORE_UNUSED | CLK_OPS_PARENT_ENABLE,
 		},
 	},
 };
