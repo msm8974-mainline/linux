@@ -1,0 +1,7 @@
+Samsung S6E3FA2 5.10" 1080×1920 AMOLED Panel
+
+Required properties:
+- compatible: must be "samsung,s6e3fa2"
+
+This binding is compatible with the simple-panel binding, which is specified
+in simple-panel.txt in this directory.
