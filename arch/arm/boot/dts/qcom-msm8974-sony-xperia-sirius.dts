@@ -586,12 +586,12 @@
 				};
 			};
 		};
-	};
 
-	dsi-phy@fd922a00 {
-		status = "ok";
+		dsi-phy@fd922a00 {
+			status = "ok";
 
-		vddio-supply = <&pm8941_l12>;
+			vddio-supply = <&pm8941_l12>;
+		};
 	};
 };
 
