@@ -21,13 +21,6 @@
 		stdout-path = "serial0:115200n8";
 	};
 
-	reserved-memory {
-		wcnss_region: wcnss@d200000 {
-			reg = <0x0d200000 0xa00000>;
-			no-map;
-		};
-	};
-
 	smd {
 		rpm {
 			rpm_requests {
