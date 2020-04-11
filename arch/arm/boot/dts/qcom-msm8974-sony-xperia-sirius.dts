@@ -417,6 +417,16 @@
 			};
 		};
 
+		i2c6_pins: i2c6 {
+			mux {
+				pins = "gpio29", "gpio30";
+				function = "blsp_i2c6";
+
+				drive-strength = <2>;
+				bias-disable;
+			};
+		};
+
 		i2c8_pins: i2c8 {
 			mux {
 				pins = "gpio47", "gpio48";
@@ -487,6 +497,35 @@
 				drive-strength = <10>;
 				bias-pull-up;
 			};
+		};
+	};
+
+	i2c@f9928000 {
+		status = "okay";
+
+		pinctrl-names = "default";
+		pinctrl-0 = <&i2c6_pins>;
+
+		nfc@28 {
+			compatible = "nxp,nxp-nci-i2c";
+
+			reg = <0x28>;
+			clock-frequency = <100000>; // todo unused?
+
+			interrupt-parent = <&msmgpio>;
+			interrupts = <24 IRQ_TYPE_EDGE_RISING>;
+
+			enable-gpios = <&pm8941_mpps 2 GPIO_ACTIVE_LOW>; // or GPIO_ACTIVE_HIGH ?
+			firmware-gpios = <&msmgpio 57 GPIO_ACTIVE_HIGH>;
+
+			// nxp,pvdd_en = <&pm8941_gpios 34 0x01>;
+			// ^ regulator-fixed with gpio?
+			// PVDD = pad supply voltage
+
+			// configure_gpio = <&pm8941_gpios 33 0x00>;
+			// configure_mpp = <&pm8941_mpps 2 0x00>;
+			// ^ seems to do some reset procedure in "board_nfc_hw_lag_check"
+
 		};
 	};
 
