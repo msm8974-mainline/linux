@@ -452,7 +452,7 @@
 	mdss@fd900000 {
 		status = "ok";
 
-		mdp@fd900100 {
+		mdp@fd900000 {
 			status = "ok";
 		};
 
