@@ -62,6 +62,30 @@
 	smd {
 		rpm {
 			rpm_requests {
+				pm8841-regulators {
+					status = "okay";
+
+					s1 {
+						regulator-min-microvolt = <675000>;
+						regulator-max-microvolt = <1050000>;
+					};
+
+					s2 {
+						regulator-min-microvolt = <500000>;
+						regulator-max-microvolt = <1050000>;
+					};
+
+					s3 {
+						regulator-min-microvolt = <1050000>;
+						regulator-max-microvolt = <1050000>;
+					};
+
+					s4 {
+						regulator-min-microvolt = <815000>;
+						regulator-max-microvolt = <900000>;
+					};
+				};
+
 				pm8941-regulators {
 					status = "okay";
 					vdd_l1_l3-supply = <&pm8941_s1>;
