@@ -537,10 +537,6 @@
 		};
 	};
 
-	ocmem@fdd00000 {
-		status = "ok";
-	};
-
 	opp_table {
 		status = "ok";
 	};
