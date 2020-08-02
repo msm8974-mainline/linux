@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
-// Copyright (c) 2013, The Linux Foundation. All rights reserved.
+// Copyright (c) 2020 FIXME
+// Generated with linux-mdss-dsi-panel-driver-generator from vendor device tree:
+//   Copyright (c) 2013, The Linux Foundation. All rights reserved. (FIXME)
 
 #include <linux/backlight.h>
 #include <linux/delay.h>
@@ -16,11 +18,8 @@
 struct s6d6fa1 {
 	struct drm_panel panel;
 	struct mipi_dsi_device *dsi;
-	struct backlight_device *backlight;
 	struct gpio_desc *reset_gpio;
-
 	bool prepared;
-	bool enabled;
 };
 
 static inline struct s6d6fa1 *to_s6d6fa1(struct drm_panel *panel)
@@ -251,42 +250,6 @@ static int s6d6fa1_unprepare(struct drm_panel *panel)
 	return 0;
 }
 
-static int s6d6fa1_enable(struct drm_panel *panel)
-{
-	struct s6d6fa1 *ctx = to_s6d6fa1(panel);
-	int ret;
-
-	if (ctx->enabled)
-		return 0;
-
-	ret = backlight_enable(ctx->backlight);
-	if (ret < 0) {
-		dev_err(&ctx->dsi->dev, "Failed to enable backlight: %d\n", ret);
-		return ret;
-	}
-
-	ctx->enabled = true;
-	return 0;
-}
-
-static int s6d6fa1_disable(struct drm_panel *panel)
-{
-	struct s6d6fa1 *ctx = to_s6d6fa1(panel);
-	int ret;
-
-	if (!ctx->enabled)
-		return 0;
-
-	ret = backlight_disable(ctx->backlight);
-	if (ret < 0) {
-		dev_err(&ctx->dsi->dev, "Failed to disable backlight: %d\n", ret);
-		return ret;
-	}
-
-	ctx->enabled = false;
-	return 0;
-}
-
 static const struct drm_display_mode s6d6fa1_mode = {
 	.clock = (1080 + 216 + 16 + 52) * (1920 + 4 + 1 + 3) * 57 / 1000,
 	.hdisplay = 1080,
@@ -322,10 +285,8 @@ static int s6d6fa1_get_modes(struct drm_panel *panel,
 }
 
 static const struct drm_panel_funcs s6d6fa1_panel_funcs = {
-	.disable = s6d6fa1_disable,
-	.unprepare = s6d6fa1_unprepare,
 	.prepare = s6d6fa1_prepare,
-	.enable = s6d6fa1_enable,
+	.unprepare = s6d6fa1_unprepare,
 	.get_modes = s6d6fa1_get_modes,
 };
 
@@ -404,13 +365,6 @@ static int s6d6fa1_probe(struct mipi_dsi_device *dsi)
 		return ret;
 	}
 
-	ctx->backlight = s6d6fa1_create_backlight(dsi);
-	if (IS_ERR(ctx->backlight)) {
-		ret = PTR_ERR(ctx->backlight);
-		dev_err(dev, "Failed to create backlight: %d\n", ret);
-		return ret;
-	}
-
 	ctx->dsi = dsi;
 	mipi_dsi_set_drvdata(dsi, ctx);
 
@@ -422,6 +376,13 @@ static int s6d6fa1_probe(struct mipi_dsi_device *dsi)
 
 	drm_panel_init(&ctx->panel, dev, &s6d6fa1_panel_funcs,
 		       DRM_MODE_CONNECTOR_DSI);
+
+	ctx->panel.backlight = s6d6fa1_create_backlight(dsi);
+	if (IS_ERR(ctx->panel.backlight)) {
+		ret = PTR_ERR(ctx->panel.backlight);
+		dev_err(dev, "Failed to create backlight: %d\n", ret);
+		return ret;
+	}
 
 	ret = drm_panel_add(&ctx->panel);
 	if (ret < 0) {
@@ -468,6 +429,6 @@ static struct mipi_dsi_driver s6d6fa1_driver = {
 };
 module_mipi_dsi_driver(s6d6fa1_driver);
 
-MODULE_AUTHOR("linux-mdss-dsi-panel-driver-generator <fix@me>");
+MODULE_AUTHOR("linux-mdss-dsi-panel-driver-generator <fix@me>"); // FIXME
 MODULE_DESCRIPTION("DRM driver for S6D6FA1 1080p video mode dsi panel");
 MODULE_LICENSE("GPL v2");
