@@ -455,7 +455,7 @@
 				reg = <0>;
 				compatible = "something,s6d6fa1";
 
-				reset-gpios = <&pm8941_gpios 19 0>;
+				reset-gpios = <&pm8941_gpios 19 GPIO_ACTIVE_LOW>;
 
 				pinctrl-names = "default";
 				pinctrl-0 = <&panel_pin>;
