@@ -45,11 +45,11 @@ static inline struct s6d6fa1 *to_s6d6fa1(struct drm_panel *panel)
 
 static void s6d6fa1_reset(struct s6d6fa1 *ctx)
 {
-	gpiod_set_value_cansleep(ctx->reset_gpio, 1);
-	usleep_range(10000, 11000);
 	gpiod_set_value_cansleep(ctx->reset_gpio, 0);
 	usleep_range(10000, 11000);
 	gpiod_set_value_cansleep(ctx->reset_gpio, 1);
+	usleep_range(10000, 11000);
+	gpiod_set_value_cansleep(ctx->reset_gpio, 0);
 	usleep_range(10000, 11000);
 }
 
@@ -223,7 +223,7 @@ static int s6d6fa1_prepare(struct drm_panel *panel)
 	ret = s6d6fa1_on(ctx);
 	if (ret < 0) {
 		dev_err(dev, "Failed to initialize panel: %d\n", ret);
-		gpiod_set_value_cansleep(ctx->reset_gpio, 0);
+		gpiod_set_value_cansleep(ctx->reset_gpio, 1);
 		return ret;
 	}
 
@@ -244,7 +244,7 @@ static int s6d6fa1_unprepare(struct drm_panel *panel)
 	if (ret < 0)
 		dev_err(dev, "Failed to un-initialize panel: %d\n", ret);
 
-	gpiod_set_value_cansleep(ctx->reset_gpio, 0);
+	gpiod_set_value_cansleep(ctx->reset_gpio, 1);
 
 	ctx->prepared = false;
 	return 0;
@@ -260,7 +260,6 @@ static const struct drm_display_mode s6d6fa1_mode = {
 	.vsync_start = 1920 + 4,
 	.vsync_end = 1920 + 4 + 1,
 	.vtotal = 1920 + 4 + 1 + 3,
-	.vrefresh = 57,
 	.width_mm = 62,
 	.height_mm = 110,
 };
@@ -358,12 +357,10 @@ static int s6d6fa1_probe(struct mipi_dsi_device *dsi)
 	if (!ctx)
 		return -ENOMEM;
 
-	ctx->reset_gpio = devm_gpiod_get(dev, "reset", GPIOD_OUT_LOW);
-	if (IS_ERR(ctx->reset_gpio)) {
-		ret = PTR_ERR(ctx->reset_gpio);
-		dev_err(dev, "Failed to get reset-gpios: %d\n", ret);
-		return ret;
-	}
+	ctx->reset_gpio = devm_gpiod_get(dev, "reset", GPIOD_OUT_HIGH);
+	if (IS_ERR(ctx->reset_gpio))
+		return dev_err_probe(dev, PTR_ERR(ctx->reset_gpio),
+				     "Failed to get reset-gpios\n");
 
 	ctx->dsi = dsi;
 	mipi_dsi_set_drvdata(dsi, ctx);
@@ -378,11 +375,9 @@ static int s6d6fa1_probe(struct mipi_dsi_device *dsi)
 		       DRM_MODE_CONNECTOR_DSI);
 
 	ctx->panel.backlight = s6d6fa1_create_backlight(dsi);
-	if (IS_ERR(ctx->panel.backlight)) {
-		ret = PTR_ERR(ctx->panel.backlight);
-		dev_err(dev, "Failed to create backlight: %d\n", ret);
-		return ret;
-	}
+	if (IS_ERR(ctx->panel.backlight))
+		return dev_err_probe(dev, PTR_ERR(ctx->panel.backlight),
+				     "Failed to create backlight\n");
 
 	ret = drm_panel_add(&ctx->panel);
 	if (ret < 0) {
