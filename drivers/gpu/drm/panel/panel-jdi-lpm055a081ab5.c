@@ -312,7 +312,6 @@ static const struct drm_display_mode default_mode = {
 	.vsync_start = 1920 + 8,
 	.vsync_end = 1920 + 8 + 2,
 	.vtotal = 1920 + 8 + 2 + 6,
-	.vrefresh = 60,
 	.flags = 0,
 };
 
@@ -327,7 +326,7 @@ static int jdi_panel_get_modes(struct drm_panel *panel,
 	if (!mode) {
 		dev_err(dev, "failed to add mode %ux%ux@%u\n",
 			default_mode.hdisplay, default_mode.vdisplay,
-			default_mode.vrefresh);
+			drm_mode_vrefresh(&default_mode));
 		return -ENOMEM;
 	}
 
