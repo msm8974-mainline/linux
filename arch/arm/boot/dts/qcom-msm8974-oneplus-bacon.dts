@@ -473,7 +473,6 @@
 
 				// backlight?
 
-				disp-te-gpios = <&msmgpio 12 0>;
 				enable-gpios = <&msmgpio 58 0>;
 				reset-gpios = <&pm8941_gpios 19 0>;
 
