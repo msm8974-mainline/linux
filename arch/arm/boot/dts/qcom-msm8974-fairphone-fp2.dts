@@ -56,6 +56,10 @@
 		vcc-supply = <&pm8941_l18>;
 	};
 
+	ethernet-bam-dmux {
+		status = "okay";
+	};
+
 	smd {
 		rpm {
 			rpm_requests {
@@ -423,6 +427,10 @@
 				qcom,init-seq = /bits/ 8 <0x1 0x64>;
 			};
 		};
+	};
+
+	dma@fc834000 {
+		status = "okay";
 	};
 
 	opp_table {
