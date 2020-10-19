@@ -136,6 +136,22 @@
 		};
 	};
 
+	bam_dmux: ethernet-bam-dmux {
+		compatible = "qcom,bam-dmux";
+
+		interrupt-parent = <&modem_smsm>;
+		interrupts = <1 IRQ_TYPE_EDGE_BOTH>, <11 IRQ_TYPE_EDGE_BOTH>;
+		interrupt-names = "pc", "pc-ack";
+
+		qcom,smem-states = <&apps_smsm 1>, <&apps_smsm 11>;
+		qcom,smem-state-names = "pc", "pc-ack";
+
+		dmas = <&bam_dmux_dma 4>, <&bam_dmux_dma 5>;
+		dma-names = "tx", "rx";
+
+		status = "disabled";
+	};
+
 	memory {
 		device_type = "memory";
 		reg = <0x0 0x0>;
@@ -826,6 +842,20 @@
 			reg = <0xf9bff000 0x200>;
 			clocks = <&gcc GCC_PRNG_AHB_CLK>;
 			clock-names = "core";
+		};
+
+		bam_dmux_dma: dma@fc834000 {
+			compatible = "qcom,bam-v1.4.0";
+			reg = <0xfc834000 0x7000>;
+			interrupts = <GIC_SPI 29 IRQ_TYPE_LEVEL_HIGH>;
+			#dma-cells = <1>;
+			qcom,ee = <0>;
+
+			num-channels = <6>;
+			qcom,num-ees = <1>;
+			qcom,remote-power-collapse;
+
+			status = "disabled";
 		};
 
 		remoteproc@fc880000 {
