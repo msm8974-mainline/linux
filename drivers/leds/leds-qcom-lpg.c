@@ -867,6 +867,7 @@ static int lpg_add_led(struct lpg *lpg, struct device_node *np)
 	struct device_node *child;
 	struct mc_subled *info;
 	struct lpg_led *led;
+	struct led_init_data init_data = {};
 	const char *state;
 	int num_channels;
 	u32 color = 0;
@@ -877,7 +878,7 @@ static int lpg_add_led(struct lpg *lpg, struct device_node *np)
 	if (ret < 0 && ret != -EINVAL)
 		return ret;
 
-	if (color == LED_COLOR_ID_MULTI)
+	if (color == LED_COLOR_ID_RGB)
 		num_channels = of_get_available_child_count(np);
 	else
 		num_channels = 1;
@@ -889,7 +890,7 @@ static int lpg_add_led(struct lpg *lpg, struct device_node *np)
 	led->lpg = lpg;
 	led->num_channels = num_channels;
 
-	if (color == LED_COLOR_ID_MULTI) {
+	if (color == LED_COLOR_ID_RGB) {
 		info = devm_kcalloc(lpg->dev, num_channels, sizeof(*info), GFP_KERNEL);
 		if (!info)
 			return -ENOMEM;
@@ -932,8 +933,6 @@ static int lpg_add_led(struct lpg *lpg, struct device_node *np)
 		}
 	}
 
-	/* Use label else node name */
-	cdev->name = of_get_property(np, "label", NULL) ? : np->name;
 	cdev->default_trigger = of_get_property(np, "linux,default-trigger", NULL);
 	cdev->max_brightness = 255;
 
@@ -945,10 +944,12 @@ static int lpg_add_led(struct lpg *lpg, struct device_node *np)
 
 	cdev->brightness_set(cdev, cdev->brightness);
 
-	if (color == LED_COLOR_ID_MULTI)
-		ret = devm_led_classdev_multicolor_register(lpg->dev, &led->mcdev);
+	init_data.fwnode = of_fwnode_handle(np);
+
+	if (color == LED_COLOR_ID_RGB)
+		ret = devm_led_classdev_multicolor_register_ext(lpg->dev, &led->mcdev, &init_data);
 	else
-		ret = devm_led_classdev_register(lpg->dev, &led->cdev);
+		ret = devm_led_classdev_register_ext(lpg->dev, &led->cdev, &init_data);
 	if (ret)
 		dev_err(lpg->dev, "unable to register %s\n", cdev->name);
 
