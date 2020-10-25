@@ -140,8 +140,8 @@ examples:
       qcom,power-source = <1>;
 
       multi-led {
-        color = <LED_COLOR_ID_MULTI>;
-        label = "rgb:notification";
+        color = <LED_COLOR_ID_RGB>;
+        function = LED_FUNCTION_STATUS;
 
         #address-cells = <1>;
         #size-cells = <0>;
