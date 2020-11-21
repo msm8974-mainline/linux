@@ -250,11 +250,19 @@
 		pinctrl-names = "default";
 		pinctrl-0 = <&vibrator_pin>;
 	};
+
+	ethernet-bam-dmux {
+		status = "okay";
+	};
 };
 
 &soc {
 	serial@f991d000 {
 		status = "ok";
+	};
+
+	dma@fc834000 {
+		status = "okay";
 	};
 
 	pinctrl@fd510000 {
