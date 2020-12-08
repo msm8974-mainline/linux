@@ -821,6 +821,32 @@ static void pcpu_copy_value(struct bpf_htab *htab, void __percpu *pptr,
 	}
 }
 
+static void pcpu_init_value(struct bpf_htab *htab, void __percpu *pptr,
+			    void *value, bool onallcpus)
+{
+	/* When using prealloc and not setting the initial value on all cpus,
+	 * zero-fill element values for other cpus (just as what happens when
+	 * not using prealloc). Otherwise, bpf program has no way to ensure
+	 * known initial values for cpus other than current one
+	 * (onallcpus=false always when coming from bpf prog).
+	 */
+	if (htab_is_prealloc(htab) && !onallcpus) {
+		u32 size = round_up(htab->map.value_size, 8);
+		int current_cpu = raw_smp_processor_id();
+		int cpu;
+
+		for_each_possible_cpu(cpu) {
+			if (cpu == current_cpu)
+				bpf_long_memcpy(per_cpu_ptr(pptr, cpu), value,
+						size);
+			else
+				memset(per_cpu_ptr(pptr, cpu), 0, size);
+		}
+	} else {
+		pcpu_copy_value(htab, pptr, value, onallcpus);
+	}
+}
+
 static bool fd_htab_map_needs_adjust(const struct bpf_htab *htab)
 {
 	return htab->map.map_type == BPF_MAP_TYPE_HASH_OF_MAPS &&
@@ -891,7 +917,7 @@ static struct htab_elem *alloc_htab_elem(struct bpf_htab *htab, void *key,
 			}
 		}
 
-		pcpu_copy_value(htab, pptr, value, onallcpus);
+		pcpu_init_value(htab, pptr, value, onallcpus);
 
 		if (!prealloc)
 			htab_elem_set_ptr(l_new, key_size, pptr);
@@ -1183,7 +1209,7 @@ static int __htab_lru_percpu_map_update_elem(struct bpf_map *map, void *key,
 		pcpu_copy_value(htab, htab_elem_get_ptr(l_old, key_size),
 				value, onallcpus);
 	} else {
-		pcpu_copy_value(htab, htab_elem_get_ptr(l_new, key_size),
+		pcpu_init_value(htab, htab_elem_get_ptr(l_new, key_size),
 				value, onallcpus);
 		hlist_nulls_add_head_rcu(&l_new->hash_node, head);
 		l_new = NULL;
@@ -1622,7 +1648,6 @@ struct bpf_iter_seq_hash_map_info {
 	struct bpf_map *map;
 	struct bpf_htab *htab;
 	void *percpu_value_buf; // non-zero means percpu hash
-	unsigned long flags;
 	u32 bucket_id;
 	u32 skip_elems;
 };
@@ -1632,7 +1657,6 @@ bpf_hash_map_seq_find_next(struct bpf_iter_seq_hash_map_info *info,
 			   struct htab_elem *prev_elem)
 {
 	const struct bpf_htab *htab = info->htab;
-	unsigned long flags = info->flags;
 	u32 skip_elems = info->skip_elems;
 	u32 bucket_id = info->bucket_id;
 	struct hlist_nulls_head *head;
@@ -1656,19 +1680,18 @@ bpf_hash_map_seq_find_next(struct bpf_iter_seq_hash_map_info *info,
 
 		/* not found, unlock and go to the next bucket */
 		b = &htab->buckets[bucket_id++];
-		htab_unlock_bucket(htab, b, flags);
+		rcu_read_unlock();
 		skip_elems = 0;
 	}
 
 	for (i = bucket_id; i < htab->n_buckets; i++) {
 		b = &htab->buckets[i];
-		flags = htab_lock_bucket(htab, b);
+		rcu_read_lock();
 
 		count = 0;
 		head = &b->head;
 		hlist_nulls_for_each_entry_rcu(elem, n, head, hash_node) {
 			if (count >= skip_elems) {
-				info->flags = flags;
 				info->bucket_id = i;
 				info->skip_elems = count;
 				return elem;
@@ -1676,7 +1699,7 @@ bpf_hash_map_seq_find_next(struct bpf_iter_seq_hash_map_info *info,
 			count++;
 		}
 
-		htab_unlock_bucket(htab, b, flags);
+		rcu_read_unlock();
 		skip_elems = 0;
 	}
 
@@ -1754,14 +1777,10 @@ static int bpf_hash_map_seq_show(struct seq_file *seq, void *v)
 
 static void bpf_hash_map_seq_stop(struct seq_file *seq, void *v)
 {
-	struct bpf_iter_seq_hash_map_info *info = seq->private;
-
 	if (!v)
 		(void)__bpf_hash_map_seq_show(seq, NULL);
 	else
-		htab_unlock_bucket(info->htab,
-				   &info->htab->buckets[info->bucket_id],
-				   info->flags);
+		rcu_read_unlock();
 }
 
 static int bpf_iter_init_hash_map(void *priv_data,

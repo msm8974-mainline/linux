@@ -1485,7 +1485,7 @@ static void node_lost_contact(struct tipc_node *n,
 
 	/* Clean up broadcast state */
 	tipc_bcast_remove_peer(n->net, n->bc_entry.link);
-	__skb_queue_purge(&n->bc_entry.namedq);
+	skb_queue_purge(&n->bc_entry.namedq);
 
 	/* Abort any ongoing link failover */
 	for (i = 0; i < MAX_BEARERS; i++) {
@@ -2171,6 +2171,8 @@ void tipc_node_apply_property(struct net *net, struct tipc_bearer *b,
 			else if (prop == TIPC_NLA_PROP_MTU)
 				tipc_link_set_mtu(e->link, b->mtu);
 		}
+		/* Update MTU for node link entry */
+		e->mtu = tipc_link_mss(e->link);
 		tipc_node_write_unlock(n);
 		tipc_bearer_xmit(net, bearer_id, &xmitq, &e->maddr, NULL);
 	}

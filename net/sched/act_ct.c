@@ -156,11 +156,11 @@ tcf_ct_flow_table_add_action_nat_udp(const struct nf_conntrack_tuple *tuple,
 	__be16 target_dst = target.dst.u.udp.port;
 
 	if (target_src != tuple->src.u.udp.port)
-		tcf_ct_add_mangle_action(action, FLOW_ACT_MANGLE_HDR_TYPE_TCP,
+		tcf_ct_add_mangle_action(action, FLOW_ACT_MANGLE_HDR_TYPE_UDP,
 					 offsetof(struct udphdr, source),
 					 0xFFFF, be16_to_cpu(target_src));
 	if (target_dst != tuple->dst.u.udp.port)
-		tcf_ct_add_mangle_action(action, FLOW_ACT_MANGLE_HDR_TYPE_TCP,
+		tcf_ct_add_mangle_action(action, FLOW_ACT_MANGLE_HDR_TYPE_UDP,
 					 offsetof(struct udphdr, dest),
 					 0xFFFF, be16_to_cpu(target_dst));
 }
@@ -1297,8 +1297,6 @@ static int tcf_ct_init(struct net *net, struct nlattr *nla,
 		tcf_chain_put_by_act(goto_ch);
 	if (params)
 		call_rcu(&params->rcu, tcf_ct_params_free);
-	if (res == ACT_P_CREATED)
-		tcf_idr_insert(tn, *a);
 
 	return res;
 

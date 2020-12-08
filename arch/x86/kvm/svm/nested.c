@@ -243,7 +243,7 @@ static bool nested_vmcb_checks(struct vcpu_svm *svm, struct vmcb *vmcb)
 	} else {
 		if (!(vmcb->save.cr4 & X86_CR4_PAE) ||
 		    !(vmcb->save.cr0 & X86_CR0_PE) ||
-		    (vmcb->save.cr3 & MSR_CR3_LONG_RESERVED_MASK))
+		    (vmcb->save.cr3 & MSR_CR3_LONG_MBZ_MASK))
 			return false;
 	}
 	if (kvm_valid_cr4(&svm->vcpu, vmcb->save.cr4))
@@ -586,7 +586,6 @@ int nested_svm_vmexit(struct vcpu_svm *svm)
 	svm->vcpu.arch.mp_state = KVM_MP_STATE_RUNNABLE;
 
 	/* Give the current vmcb to the guest */
-	svm_set_gif(svm, false);
 
 	nested_vmcb->save.es     = vmcb->save.es;
 	nested_vmcb->save.cs     = vmcb->save.cs;
@@ -631,6 +630,9 @@ int nested_svm_vmexit(struct vcpu_svm *svm)
 
 	/* Restore the original control entries */
 	copy_vmcb_control_area(&vmcb->control, &hsave->control);
+
+	/* On vmexit the  GIF is set to false */
+	svm_set_gif(svm, false);
 
 	svm->vmcb->control.tsc_offset = svm->vcpu.arch.tsc_offset =
 		svm->vcpu.arch.l1_tsc_offset;
@@ -1131,6 +1133,9 @@ static int svm_set_nested_state(struct kvm_vcpu *vcpu,
 	svm->nested.vmcb = kvm_state->hdr.svm.vmcb_pa;
 	load_nested_vmcb_control(svm, &ctl);
 	nested_prepare_vmcb_control(svm);
+
+	if (!nested_svm_vmrun_msrpm(svm))
+		return -EINVAL;
 
 out_set_gif:
 	svm_set_gif(svm, !!(kvm_state->flags & KVM_STATE_NESTED_GIF_SET));

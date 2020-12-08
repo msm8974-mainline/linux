@@ -647,8 +647,7 @@ static void macb_mac_link_up(struct phylink_config *config,
 				ctrl |= GEM_BIT(GBE);
 		}
 
-		/* We do not support MLO_PAUSE_RX yet */
-		if (tx_pause)
+		if (rx_pause)
 			ctrl |= MACB_BIT(PAE);
 
 		macb_set_tx_clk(bp->tx_clk, speed, ndev);
@@ -1931,7 +1930,8 @@ static inline int macb_clear_csum(struct sk_buff *skb)
 
 static int macb_pad_and_fcs(struct sk_buff **skb, struct net_device *ndev)
 {
-	bool cloned = skb_cloned(*skb) || skb_header_cloned(*skb);
+	bool cloned = skb_cloned(*skb) || skb_header_cloned(*skb) ||
+		      skb_is_nonlinear(*skb);
 	int padlen = ETH_ZLEN - (*skb)->len;
 	int headroom = skb_headroom(*skb);
 	int tailroom = skb_tailroom(*skb);
