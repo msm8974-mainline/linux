@@ -1201,7 +1201,7 @@ static int rpm_smd_clk_probe(struct platform_device *pdev)
 	num_clks = desc->num_clks;
 
 	/* delay rpm init, somehow this fixes some problems */
-	usleep_range(100000, 110000);
+	usleep_range(200000, 210000);
 
 	for (i = 0; i < num_clks; i++) {
 		if (!rpm_smd_clks[i])
