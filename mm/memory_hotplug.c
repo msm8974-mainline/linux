@@ -67,17 +67,17 @@ void put_online_mems(void)
 bool movable_node_enabled = false;
 
 #ifndef CONFIG_MEMORY_HOTPLUG_DEFAULT_ONLINE
-int memhp_default_online_type = MMOP_OFFLINE;
+int mhp_default_online_type = MMOP_OFFLINE;
 #else
-int memhp_default_online_type = MMOP_ONLINE;
+int mhp_default_online_type = MMOP_ONLINE;
 #endif
 
 static int __init setup_memhp_default_state(char *str)
 {
-	const int online_type = memhp_online_type_from_str(str);
+	const int online_type = mhp_online_type_from_str(str);
 
 	if (online_type >= 0)
-		memhp_default_online_type = online_type;
+		mhp_default_online_type = online_type;
 
 	return 1;
 }
@@ -301,6 +301,54 @@ static int check_hotplug_memory_addressable(unsigned long pfn,
 }
 
 /*
+ * Return page for the valid pfn only if the page is online. All pfn
+ * walkers which rely on the fully initialized page->flags and others
+ * should use this rather than pfn_valid && pfn_to_page
+ */
+struct page *pfn_to_online_page(unsigned long pfn)
+{
+	unsigned long nr = pfn_to_section_nr(pfn);
+	struct dev_pagemap *pgmap;
+	struct mem_section *ms;
+
+	if (nr >= NR_MEM_SECTIONS)
+		return NULL;
+
+	ms = __nr_to_section(nr);
+	if (!online_section(ms))
+		return NULL;
+
+	/*
+	 * Save some code text when online_section() +
+	 * pfn_section_valid() are sufficient.
+	 */
+	if (IS_ENABLED(CONFIG_HAVE_ARCH_PFN_VALID) && !pfn_valid(pfn))
+		return NULL;
+
+	if (!pfn_section_valid(ms, pfn))
+		return NULL;
+
+	if (!online_device_section(ms))
+		return pfn_to_page(pfn);
+
+	/*
+	 * Slowpath: when ZONE_DEVICE collides with
+	 * ZONE_{NORMAL,MOVABLE} within the same section some pfns in
+	 * the section may be 'offline' but 'valid'. Only
+	 * get_dev_pagemap() can determine sub-section online status.
+	 */
+	pgmap = get_dev_pagemap(pfn, NULL);
+	put_dev_pagemap(pgmap);
+
+	/* The presence of a pgmap indicates ZONE_DEVICE offline pfn */
+	if (pgmap)
+		return NULL;
+
+	return pfn_to_page(pfn);
+}
+EXPORT_SYMBOL_GPL(pfn_to_online_page);
+
+/*
  * Reasonably generic function for adding memory.  It is
  * expected that archs that support memory hotplug will
  * call this function after deciding the zone to which to
@@ -445,20 +493,19 @@ static void update_pgdat_span(struct pglist_data *pgdat)
 
 	for (zone = pgdat->node_zones;
 	     zone < pgdat->node_zones + MAX_NR_ZONES; zone++) {
-		unsigned long zone_end_pfn = zone->zone_start_pfn +
-					     zone->spanned_pages;
+		unsigned long end_pfn = zone_end_pfn(zone);
 
 		/* No need to lock the zones, they can't change. */
 		if (!zone->spanned_pages)
 			continue;
 		if (!node_end_pfn) {
 			node_start_pfn = zone->zone_start_pfn;
-			node_end_pfn = zone_end_pfn;
+			node_end_pfn = end_pfn;
 			continue;
 		}
 
-		if (zone_end_pfn > node_end_pfn)
-			node_end_pfn = zone_end_pfn;
+		if (end_pfn > node_end_pfn)
+			node_end_pfn = end_pfn;
 		if (zone->zone_start_pfn < node_start_pfn)
 			node_start_pfn = zone->zone_start_pfn;
 	}
@@ -678,6 +725,14 @@ static void __meminit resize_pgdat_range(struct pglist_data *pgdat, unsigned lon
 	pgdat->node_spanned_pages = max(start_pfn + nr_pages, old_end_pfn) - pgdat->node_start_pfn;
 
 }
+
+static void section_taint_zone_device(unsigned long pfn)
+{
+	struct mem_section *ms = __pfn_to_section(pfn);
+
+	ms->section_mem_map |= SECTION_TAINT_ZONE_DEVICE;
+}
+
 /*
  * Associate the pfn range with the given zone, initializing the memmaps
  * and resizing the pgdat/zone data to span the added pages. After this
@@ -708,12 +763,25 @@ void __ref move_pfn_range_to_zone(struct zone *zone, unsigned long start_pfn,
 	pgdat_resize_unlock(pgdat, &flags);
 
 	/*
+	 * Subsection population requires care in pfn_to_online_page().
+	 * Set the taint to enable the slow path detection of
+	 * ZONE_DEVICE pages in an otherwise  ZONE_{NORMAL,MOVABLE}
+	 * section.
+	 */
+	if (zone_is_zone_device(zone)) {
+		if (!IS_ALIGNED(start_pfn, PAGES_PER_SECTION))
+			section_taint_zone_device(start_pfn);
+		if (!IS_ALIGNED(start_pfn + nr_pages, PAGES_PER_SECTION))
+			section_taint_zone_device(start_pfn + nr_pages);
+	}
+
+	/*
 	 * TODO now we have a visible range of pages which are not associated
 	 * with their zone properly. Not nice but set_pfnblock_flags_mask
 	 * expects the zone spans the pfn range. All the pages in the range
 	 * are reserved so nobody should be touching them so we should be safe
 	 */
-	memmap_init_zone(nr_pages, nid, zone_idx(zone), start_pfn, 0,
+	memmap_init_range(nr_pages, nid, zone_idx(zone), start_pfn, 0,
 			 MEMINIT_HOTPLUG, altmap, migratetype);
 
 	set_zone_contiguous(zone);
@@ -1007,7 +1075,7 @@ static int check_hotplug_memory_range(u64 start, u64 size)
 
 static int online_memory_block(struct memory_block *mem, void *arg)
 {
-	mem->online_type = memhp_default_online_type;
+	mem->online_type = mhp_default_online_type;
 	return device_online(&mem->dev);
 }
 
@@ -1084,11 +1152,11 @@ int __ref add_memory_resource(int nid, struct resource *res, mhp_t mhp_flags)
 	 * In case we're allowed to merge the resource, flag it and trigger
 	 * merging now that adding succeeded.
 	 */
-	if (mhp_flags & MEMHP_MERGE_RESOURCE)
+	if (mhp_flags & MHP_MERGE_RESOURCE)
 		merge_system_ram_resource(res);
 
 	/* online pages if requested */
-	if (memhp_default_online_type != MMOP_OFFLINE)
+	if (mhp_default_online_type != MMOP_OFFLINE)
 		walk_memory_blocks(start, size, NULL, online_memory_block);
 
 	return ret;
@@ -1260,7 +1328,14 @@ static int scan_movable_pages(unsigned long start, unsigned long end,
 		if (!PageHuge(page))
 			continue;
 		head = compound_head(page);
-		if (page_huge_active(head))
+		/*
+		 * This test is racy as we hold no reference or lock.  The
+		 * hugetlb page could have been free'ed and head is no longer
+		 * a hugetlb page before the following check.  In such unlikely
+		 * cases false positives and negatives are possible.  Calling
+		 * code must deal with these scenarios.
+		 */
+		if (HPageMigratable(head))
 			goto found;
 		skip = compound_nr(head) - (page - head);
 		pfn += skip - 1;
