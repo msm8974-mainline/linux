@@ -244,6 +244,7 @@ static const struct msm_dsi_cfg_handler *dsi_get_config(
 	cfg_hnd = msm_dsi_cfg_get(major, minor);
 
 	DBG("%s: Version %x:%x\n", __func__, major, minor);
+	pr_info("%s: Version %x:%x\n", __func__, major, minor);
 
 disable_clks:
 	clk_disable_unprepare(ahb_clk);
@@ -452,6 +453,13 @@ static int dsi_bus_clk_enable(struct msm_dsi_host *msm_host)
 	int i, ret;
 
 	DBG("id=%d", msm_host->id);
+
+	/* set the mdp_core clock to the high value for now .. */
+	// ret = clk_set_rate(msm_host->bus_clks[0], 320000000);
+	// WARN_ON(ret);
+	/* set the bus clock to the high value for now .. */
+	// ret = clk_set_rate(msm_host->bus_clks[2], 466800000);
+	// WARN_ON(ret);
 
 	for (i = 0; i < cfg->num_bus_clks; i++) {
 		ret = clk_prepare_enable(msm_host->bus_clks[i]);
