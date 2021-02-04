@@ -527,7 +527,7 @@ int ssp_set_magnetic_matrix(struct ssp_data *data)
 	int ret;
 	struct ssp_msg *msg;
 
-	msg = ssp_create_msg(SSP_MSG2SSP_AP_SET_MAGNETIC_STATIC_MATRIX,
+	msg = ssp_create_msg(data->sensorhub_info->mag_table_cmd,
 			     data->sensorhub_info->mag_length, SSP_AP2HUB_WRITE,
 			     0);
 	if (!msg)

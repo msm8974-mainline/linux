@@ -1009,6 +1009,19 @@
 			dma-names = "tx", "rx";
 		};
 
+		blsp_spi11: spi@f9967000 {
+			status = "disabled";
+			compatible = "qcom,spi-qup-v2.1.1";
+			reg = <0xf9967000 0x1000>;
+			interrupts = <GIC_SPI 105 IRQ_TYPE_LEVEL_HIGH>;
+			clocks = <&gcc GCC_BLSP2_QUP5_SPI_APPS_CLK>, <&gcc GCC_BLSP2_AHB_CLK>;
+			clock-names = "core", "iface";
+			#address-cells = <1>;
+			#size-cells = <0>;
+			dmas = <&blsp2_dma 20>, <&blsp2_dma 21>;
+			dma-names = "tx", "rx";
+		};
+
 		blsp_i2c12: i2c@f9968000 {
 			status = "disabled";
 			compatible = "qcom,i2c-qup-v2.1.1";

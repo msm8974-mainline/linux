@@ -10,6 +10,7 @@
 #include <linux/module.h>
 #include <linux/of.h>
 #include <linux/of_platform.h>
+#include <linux/regulator/consumer.h>
 #include "ssp.h"
 
 #define SSP_WDT_TIME			10000
@@ -37,6 +38,7 @@ static const struct ssp_sensorhub_info ssp_rinato_info = {
 	.fw_name = "ssp_B2.fw",
 	.fw_crashed_name = "ssp_crashed.fw",
 	.fw_rev = 14052300,
+	.mag_table_cmd = SSP_MSG2SSP_AP_SET_MAGNETIC_STATIC_MATRIX,
 	.mag_table = ssp_magnitude_table,
 	.mag_length = ARRAY_SIZE(ssp_magnitude_table),
 };
@@ -45,8 +47,23 @@ static const struct ssp_sensorhub_info ssp_thermostat_info = {
 	.fw_name = "thermostat_B2.fw",
 	.fw_crashed_name = "ssp_crashed.fw",
 	.fw_rev = 14080600,
+	.mag_table_cmd = SSP_MSG2SSP_AP_SET_MAGNETIC_STATIC_MATRIX,
 	.mag_table = ssp_magnitude_table,
 	.mag_length = ARRAY_SIZE(ssp_magnitude_table),
+};
+
+static const u8 ssp_position_table[] = {6, 6, 7};
+static const char *klte_supplies[] = {"hub", "psns"};
+
+static const struct ssp_sensorhub_info ssp_klte_info = {
+	.fw_name = "klte_B2.fw",
+	.fw_crashed_name = "ssp_crashed.fw",
+	.fw_rev = 16101000,
+	.mag_table_cmd = SSP_MSG2SSP_AP_SENSOR_FORMATION,
+	.mag_table = ssp_position_table,
+	.mag_length = ARRAY_SIZE(ssp_position_table),
+	.supplies = klte_supplies,
+	.supplies_length = ARRAY_SIZE(klte_supplies),
 };
 
 static const struct mfd_cell sensorhub_sensor_devs[] = {
@@ -433,6 +450,9 @@ static const struct of_device_id ssp_of_match[] = {
 	}, {
 		.compatible	= "samsung,sensorhub-thermostat",
 		.data		= &ssp_thermostat_info,
+	}, {
+		.compatible	= "samsung,sensorhub-klte",
+		.data		= &ssp_klte_info,
 	},
 	{},
 };
@@ -442,6 +462,8 @@ static struct ssp_data *ssp_parse_dt(struct device *dev)
 {
 	struct ssp_data *data;
 	struct device_node *node = dev->of_node;
+	int num_supplies;
+	int ret;
 	const struct of_device_id *match;
 
 	data = devm_kzalloc(dev, sizeof(*data), GFP_KERNEL);
@@ -466,6 +488,31 @@ static struct ssp_data *ssp_parse_dt(struct device *dev)
 		return NULL;
 
 	data->sensorhub_info = match->data;
+
+	num_supplies = data->sensorhub_info->supplies_length;
+	if (num_supplies) {
+		pr_info("%s: will read/enable regulators\n", __func__);
+		data->supplies = devm_kzalloc(dev,
+				sizeof(*data->supplies) * num_supplies,
+				GFP_KERNEL);
+		if (!data->supplies)
+			return NULL;
+		data->supplies[0].supply = data->sensorhub_info->supplies[0];
+		data->supplies[1].supply = data->sensorhub_info->supplies[1];
+		ret = devm_regulator_bulk_get(dev, num_supplies, data->supplies);
+		if (ret < 0) {
+			pr_err("%s: Failed to get regulators %s %s\n",
+					__func__, data->supplies[0].supply,
+					data->supplies[1].supply);
+			return NULL;
+		}
+		ret = regulator_bulk_enable(num_supplies, data->supplies);
+		if (ret < 0) {
+			pr_err("%s: Failed to enable regulators\n", __func__);
+			return NULL;
+		}
+	}
+
 
 	dev_set_drvdata(dev, data);
 
@@ -496,6 +543,8 @@ static int ssp_probe(struct spi_device *spi)
 {
 	int ret, i;
 	struct ssp_data *data;
+
+	pr_info("%s: here\n", __func__);
 
 	data = ssp_parse_dt(&spi->dev);
 	if (!data) {

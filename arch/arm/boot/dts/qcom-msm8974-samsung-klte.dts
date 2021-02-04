@@ -422,6 +422,23 @@
 			};
 		};
 
+		spi11_pins: spi11 {
+			most {
+				pins = "gpio81", "gpio82", "gpio84";
+				function = "blsp_spi11";
+
+				drive-strength = <8>;
+				bias-pull-down;
+			};
+
+			cs {
+				pins = "gpio83";
+				function = "blsp_spi11";
+				drive-strength = <8>;
+				bias-pull-up;
+			};
+		};
+
 		i2c12_pins: i2c12 {
 			mux {
 				pins = "gpio87", "gpio88";
@@ -700,6 +717,32 @@
 					regulator-max-microvolt = <3400000>;
 				};
 			};
+		};
+	};
+
+	spi@f9967000 {
+		status = "okay";
+		pinctrl-names = "default";
+		pinctrl-0 = <&spi11_pins>;
+
+		spi-max-frequency = <19200000>;
+
+		stm32f@0 {
+			compatible = "samsung,sensorhub-klte";
+			reg = <0>;
+
+			spi-max-frequency = <4800000>;
+			interrupts = <&msmgpio 74 0>;
+			hub-supply = <&pma8084_lvs1>;
+			psns-supply = <&pma8084_l18>;
+			// ssp,mcu_int1-gpio = <&msmgpio 74 0x00>; /* this is the interrupt one */
+			mcu-ap-gpios = <&msmgpio 86 0>;
+			ap-mcu-gpios = <&msmgpio 89 0>;
+			mcu-reset-gpios = <&msmgpio 9 0>;
+			// ssp,acc-position = <6>;			/* ? accel_position */
+			// ssp,mag-position = <7>;			/* ? mag_position */
+			// ssp,ap-rev=<5>;				/* LPS25H barometer, has temp */
+			// qcom,temphumidity_sensor-vadc = <&pma8084_vadc>; /* not used in code? */
 		};
 	};
 

@@ -124,8 +124,11 @@ struct ssp_sensorhub_info {
 	char *fw_name;
 	char *fw_crashed_name;
 	unsigned int fw_rev;
+	const u8 mag_table_cmd;
 	const u8 * const mag_table;
 	const unsigned int mag_length;
+	const char ** const supplies;
+	const unsigned int supplies_length;
 };
 
 /* ssp_msg options bit */
@@ -215,6 +218,7 @@ struct ssp_data {
 	struct gpio_desc *mcu_reset_gpiod;
 	struct gpio_desc *ap_mcu_gpiod;
 	struct gpio_desc *mcu_ap_gpiod;
+	struct regulator_bulk_data *supplies;
 
 	struct list_head pending_list;
 
