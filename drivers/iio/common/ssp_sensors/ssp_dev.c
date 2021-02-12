@@ -468,24 +468,24 @@ static struct ssp_data *ssp_parse_dt(struct device *dev)
 
 	data = devm_kzalloc(dev, sizeof(*data), GFP_KERNEL);
 	if (!data)
-		return NULL;
+		return ERR_PTR(-ENODEV);
 
 	data->mcu_ap_gpiod = devm_gpiod_get(dev, "mcu-ap", GPIOD_IN);
 	if (IS_ERR(data->mcu_ap_gpiod))
-		return NULL;
+		return ERR_PTR(-ENODEV);
 
 	data->ap_mcu_gpiod = devm_gpiod_get(dev, "ap-mcu", GPIOD_OUT_HIGH);
 	if (IS_ERR(data->ap_mcu_gpiod))
-		return NULL;
+		return ERR_PTR(-ENODEV);
 
 	data->mcu_reset_gpiod = devm_gpiod_get(dev, "mcu-reset",
 					       GPIOD_OUT_HIGH);
 	if (IS_ERR(data->mcu_reset_gpiod))
-		return NULL;
+		return ERR_PTR(-ENODEV);
 
 	match = of_match_node(ssp_of_match, node);
 	if (!match)
-		return NULL;
+		return ERR_PTR(-ENODEV);
 
 	data->sensorhub_info = match->data;
 
@@ -496,20 +496,30 @@ static struct ssp_data *ssp_parse_dt(struct device *dev)
 				sizeof(*data->supplies) * num_supplies,
 				GFP_KERNEL);
 		if (!data->supplies)
-			return NULL;
+			return ERR_PTR(-ENOMEM);
+
+		// struct regulator *hub_reg = devm_regulator_get(dev, "hub");
+		// if (IS_ERR(hub_reg)) {
+		// 	pr_info("failed to get HUB\n");
+		// 	return NULL;
+		// }
+		// struct regulator *psns_reg = devm_regulator_get(dev, "psns");
+		// if (IS_ERR(psns_reg)) {
+		// 	pr_info("failed to get PSNS\n");
+		// 	return NULL;
+		// }
+		// pr_info("single reg get works...\n");
+
 		data->supplies[0].supply = data->sensorhub_info->supplies[0];
 		data->supplies[1].supply = data->sensorhub_info->supplies[1];
 		ret = devm_regulator_bulk_get(dev, num_supplies, data->supplies);
 		if (ret < 0) {
-			pr_err("%s: Failed to get regulators %s %s\n",
+			pr_err("%s: Failed to get regulators %s %s %d\n",
 					__func__, data->supplies[0].supply,
-					data->supplies[1].supply);
-			return NULL;
-		}
-		ret = regulator_bulk_enable(num_supplies, data->supplies);
-		if (ret < 0) {
-			pr_err("%s: Failed to enable regulators\n", __func__);
-			return NULL;
+					data->supplies[1].supply, ret);
+			if (ret == -EPROBE_DEFER)
+				return ERR_PTR(-EPROBE_DEFER);
+			return ERR_PTR(-ENODEV);
 		}
 	}
 
@@ -521,7 +531,7 @@ static struct ssp_data *ssp_parse_dt(struct device *dev)
 #else
 static struct ssp_data *ssp_parse_dt(struct device *pdev)
 {
-	return NULL;
+	return ERR_PTR(-ENODEV);
 }
 #endif
 
@@ -547,24 +557,34 @@ static int ssp_probe(struct spi_device *spi)
 	pr_info("%s: here\n", __func__);
 
 	data = ssp_parse_dt(&spi->dev);
-	if (!data) {
-		dev_err(&spi->dev, "Failed to find platform data\n");
-		return -ENODEV;
+	if (IS_ERR(data))
+		return dev_err_probe(&spi->dev, PTR_ERR(data),
+				"Failed to find platform data\n");
+
+	if (data->supplies) {
+		ret = regulator_bulk_enable(
+				data->sensorhub_info->supplies_length,
+				data->supplies);
+		if (ret < 0) {
+			pr_err("%s: Failed to enable regulators\n", __func__);
+			return ret;
+		}
 	}
 
-	ret = mfd_add_devices(&spi->dev, PLATFORM_DEVID_NONE,
+	ret = devm_mfd_add_devices(&spi->dev, PLATFORM_DEVID_NONE,
 			      sensorhub_sensor_devs,
 			      ARRAY_SIZE(sensorhub_sensor_devs), NULL, 0, NULL);
 	if (ret < 0) {
 		dev_err(&spi->dev, "mfd add devices fail\n");
-		return ret;
+		goto err_disable_regulators;
+		// return ret;
 	}
 
 	spi->mode = SPI_MODE_1;
 	ret = spi_setup(spi);
 	if (ret < 0) {
 		dev_err(&spi->dev, "Failed to setup spi\n");
-		return ret;
+		goto err_disable_regulators;
 	}
 
 	data->fw_dl_state = SSP_FW_DL_STATE_NONE;
@@ -594,12 +614,12 @@ static int ssp_probe(struct spi_device *spi)
 
 	timer_setup(&data->wdt_timer, ssp_wdt_timer_func, 0);
 
-	ret = request_threaded_irq(data->spi->irq, NULL,
+	ret = devm_request_threaded_irq(&spi->dev, data->spi->irq, NULL,
 				   ssp_irq_thread_fn,
 				   IRQF_TRIGGER_FALLING | IRQF_ONESHOT,
 				   "SSP_Int", data);
 	if (ret < 0) {
-		dev_err(&spi->dev, "Irq request fail\n");
+		dev_err(&spi->dev, "Irq request fail: %d\n", ret);
 		goto err_setup_irq;
 	}
 
@@ -625,10 +645,14 @@ static int ssp_probe(struct spi_device *spi)
 	return 0;
 
 err_read_reg:
-	free_irq(data->spi->irq, data);
+	// free_irq(data->spi->irq, data);
 err_setup_irq:
 	mutex_destroy(&data->pending_lock);
 	mutex_destroy(&data->comm_lock);
+err_disable_regulators:
+	if (data->supplies)
+		regulator_bulk_disable(data->sensorhub_info->supplies_length,
+					data->supplies);
 
 	dev_err(&spi->dev, "Probe failed!\n");
 
@@ -648,7 +672,7 @@ static int ssp_remove(struct spi_device *spi)
 
 	ssp_clean_pending_list(data);
 
-	free_irq(data->spi->irq, data);
+	// free_irq(data->spi->irq, data);
 
 	del_timer_sync(&data->wdt_timer);
 	cancel_work_sync(&data->work_wdt);
@@ -656,7 +680,7 @@ static int ssp_remove(struct spi_device *spi)
 	mutex_destroy(&data->comm_lock);
 	mutex_destroy(&data->pending_lock);
 
-	mfd_remove_devices(&spi->dev);
+	// mfd_remove_devices(&spi->dev);
 
 	return 0;
 }

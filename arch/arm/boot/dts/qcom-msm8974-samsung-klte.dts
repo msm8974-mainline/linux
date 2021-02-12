@@ -449,6 +449,39 @@
 			};
 		};
 
+		sensorhub_pins: sensorhub {
+			rst {
+				pins = "gpio9";
+				function = "gpio";
+				output-high;
+				bias-disable;
+				drive-strength = <2>;
+			};
+
+			int {
+				pins = "gpio74";
+				function = "gpio";
+				input-enable;
+				bias-disable;
+				// drive-strength = <2>;
+			};
+
+			in {
+				pins = "gpio86";
+				function = "gpio";
+				input-enable;
+				bias-disable;
+				// drive-strength = <2>;
+			};
+
+			out {
+				pins = "gpio89";
+				function = "gpio";
+				bias-disable;
+				drive-strength = <8>;
+			};
+		};
+
 		i2c_touchkey_pins: i2c-touchkey {
 			mux {
 				pins = "gpio95", "gpio96";
@@ -731,14 +764,19 @@
 			compatible = "samsung,sensorhub-klte";
 			reg = <0>;
 
+			pinctrl-names = "default";
+			pinctrl-0 = <&sensorhub_pins>;
+
 			spi-max-frequency = <4800000>;
-			interrupts = <&msmgpio 74 0>;
+			interrupt-parent = <&msmgpio>;
+			interrupts = <74 IRQ_TYPE_EDGE_FALLING>;
+
 			hub-supply = <&pma8084_lvs1>;
 			psns-supply = <&pma8084_l18>;
 			// ssp,mcu_int1-gpio = <&msmgpio 74 0x00>; /* this is the interrupt one */
-			mcu-ap-gpios = <&msmgpio 86 0>;
-			ap-mcu-gpios = <&msmgpio 89 0>;
-			mcu-reset-gpios = <&msmgpio 9 0>;
+			mcu-ap-gpios = <&msmgpio 86 GPIO_ACTIVE_HIGH>;
+			ap-mcu-gpios = <&msmgpio 89 GPIO_ACTIVE_HIGH>;
+			mcu-reset-gpios = <&msmgpio 9 GPIO_ACTIVE_HIGH>;
 			// ssp,acc-position = <6>;			/* ? accel_position */
 			// ssp,mag-position = <7>;			/* ? mag_position */
 			// ssp,ap-rev=<5>;				/* LPS25H barometer, has temp */
