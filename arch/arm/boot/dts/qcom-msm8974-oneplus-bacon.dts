@@ -320,6 +320,16 @@
 			};
 		};
 
+		i2c6_pins: i2c6 {
+			mux {
+				pins = "gpio29", "gpio30";
+				function = "blsp_i2c6";
+
+				drive-strength = <2>;
+				bias-disable;
+			};
+		};
+
 		touch_pin: touch {
 			int {
 				pins = "gpio61";
@@ -494,6 +504,19 @@
 		};
 	};
 
+	i2c@f9923000 {
+		status = "okay";
+		pinctrl-names = "default";
+		pinctrl-0 = <&i2c1_pins>;
+		clock-frequency = <100000>;
+
+		bq27541_fuelgauge: battery@55 {
+			compatible = "ti,bq27541";
+			reg = <0x55>;
+			power-supplies = <&bq24196_charger>;
+		};
+	};
+
 	i2c@f9924000 {
 		status = "ok";
 
@@ -529,6 +552,20 @@
 
 			// reset msmgpio 8
 			// other functions available ?
+		};
+	};
+
+	i2c@f9928000 {
+		status = "okay";
+		pinctrl-names = "default";
+		pinctrl-0 = <&i2c6_pins>;
+		clock-frequency = <100000>;
+
+		bq24196_charger: charger@6b {
+			compatible = "ti,bq24196";
+			reg = <0x6b>;
+			interrupts-extended = <&msmgpio 31 IRQ_TYPE_EDGE_FALLING>;
+			omit-battery-class;
 		};
 	};
 };
