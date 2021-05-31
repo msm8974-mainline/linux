@@ -50,6 +50,19 @@
 		};
 	};
 
+	vreg_panel: regulator-panel {
+		compatible = "regulator-fixed";
+		regulator-name = "panel-vddr-reg";
+		regulator-min-microvolt = <1500000>;
+		regulator-max-microvolt = <1500000>;
+
+		gpio = <&pm8941_gpios 14 GPIO_ACTIVE_HIGH>;
+		enable-active-high;
+
+		pinctrl-names = "default";
+		pinctrl-0 = <&panel_en_pin>;
+	};
+
 	touch_ldo: regulator-touch {
 		compatible = "regulator-fixed";
 		regulator-name = "touch-ldo";
@@ -118,6 +131,51 @@
 	status = "okay";
 };
 
+&gpu {
+	status = "okay";
+};
+
+&mdss {
+	status = "okay";
+};
+
+&mdss_dsi0 {
+	vdda-supply = <&pm8941_l2>;
+	vdd-supply = <&pm8941_l22>;
+	vddio-supply = <&pm8941_l12>;
+
+	status = "okay";
+
+	panel: panel@0 {
+		reg = <0>;
+		compatible = "samsung,s6e3fa0";
+
+		pinctrl-names = "default";
+		pinctrl-0 = <&panel_te_pin>, <&panel_rst_pin>;
+
+		iovdd-supply = <&pm8941_l12>;
+		vddr-supply = <&vreg_panel>;
+
+		reset-gpios = <&pm8941_gpios 19 GPIO_ACTIVE_LOW>;
+
+		port {
+			panel_in: endpoint {
+				remote-endpoint = <&mdss_dsi0_out>;
+			};
+		};
+	};
+};
+
+&mdss_dsi0_out {
+	remote-endpoint = <&panel_in>;
+	data-lanes = <0 1 2 3>;
+};
+
+&mdss_dsi0_phy {
+	vddio-supply = <&pm8941_l12>;
+	status = "okay";
+};
+
 &pm8941_gpios {
 	gpio_keys_pin_a: gpio-keys-active-state {
 		pins = "gpio2", "gpio3", "gpio5";
@@ -148,6 +206,22 @@
 		output-high;
 		power-source = <PM8941_GPIO_S3>;
 		qcom,drive-strength = <PMIC_GPIO_STRENGTH_HIGH>;
+	};
+
+	panel_en_pin: panel-en-state {
+		pins = "gpio14";
+		function = "normal";
+		bias-pull-up;
+		power-source = <PM8941_GPIO_S3>;
+		qcom,drive-strength = <PMIC_GPIO_STRENGTH_LOW>;
+	};
+
+	panel_rst_pin: panel-rst-state {
+		pins = "gpio19";
+		function = "normal";
+		bias-disable;
+		power-source = <PM8941_GPIO_S3>;
+		qcom,drive-strength = <PMIC_GPIO_STRENGTH_LOW>;
 	};
 };
 
@@ -376,6 +450,13 @@
 		pins = "gpio35", "gpio36", "gpio37", "gpio38", "gpio39", "gpio40";
 		function = "sdc3";
 		drive-strength = <8>;
+		bias-disable;
+	};
+
+	panel_te_pin: panel-state {
+		pins = "gpio12";
+		function = "mdp_vsync";
+		drive-strength = <2>;
 		bias-disable;
 	};
 };
