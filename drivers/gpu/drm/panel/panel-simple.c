@@ -4300,6 +4300,34 @@ static const struct panel_desc_dsi sharp_ls052t3sx02 = {
 	.lanes = 4,
 };
 
+static const struct drm_display_mode s6e3fa0_mode = {
+	.clock = 149769,
+	.hdisplay = 1080,
+	.hsync_start = 1080 + 162,
+	.hsync_end = 1080 + 162 + 10,
+	.htotal = 1080 + 162 + 10 + 36,
+	.vdisplay = 1920,
+	.vsync_start = 1920 + 13,
+	.vsync_end = 1920 + 13 + 2,
+	.vtotal = 1920 + 13 + 2 + 3,
+};
+
+static const struct panel_desc_dsi samsung_s6e3fa0 = {
+	.desc = {
+			.modes = &s6e3fa0_mode,
+			.num_modes = 1,
+			.bpc = 8,
+			.size = {
+					.width = 71,
+					.height = 126,
+			},
+			.connector_type = DRM_MODE_CONNECTOR_DSI,
+	},
+	.flags = MIPI_DSI_MODE_VIDEO_BURST,
+	.format = MIPI_DSI_FMT_RGB888,
+	.lanes = 4,
+};
+
 static const struct of_device_id dsi_of_match[] = {
 	{
 		.compatible = "auo,b080uan01",
@@ -4325,6 +4353,9 @@ static const struct of_device_id dsi_of_match[] = {
 	}, {
 		.compatible = "sharp,ls052t3sx02",
 		.data = &sharp_ls052t3sx02
+	}, {
+		.compatible = "samsung,s6e3fa0",
+		.data = &samsung_s6e3fa0
 	}, {
 		/* sentinel */
 	}
