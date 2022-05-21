@@ -568,10 +568,73 @@
 			omit-battery-class;
 		};
 	};
+
+	gpio_keys {
+		compatible = "gpio-keys";
+		input-name = "gpio-keys";
+		status = "ok";
+
+		vol_up {
+			label = "volume_up";
+			gpios = <&pm8941_gpios 5 GPIO_ACTIVE_LOW>;
+			linux,input-type = <1>;
+			linux,code = <KEY_VOLUMEUP>;
+			debounce-interval = <15>;
+		};
+
+		vol_down {
+			label = "volume_down";
+			gpios = <&pm8941_gpios 2 GPIO_ACTIVE_LOW>;
+			linux,input-type = <1>;
+			linux,code = <KEY_VOLUMEDOWN>;
+			debounce-interval = <15>;
+		};
+	};
 };
 
 &spmi_bus {
 	pm8941@0 {
+		power-on@800 {
+			compatible = "qcom,qpnp-power-on";
+			reg = <0x800 0x100>;
+			interrupts = <0x00 0x08 0x00 0x00 0x08 0x01 0x00 0x08 0x04 0x00 0x08 0x05>;
+			interrupt-names = "kpdpwr\0resin\0resin-bark\0kpdpwr-resin-bark";
+			qcom,pon-dbc-delay = <0x3d09>;
+			qcom,system-reset;
+			qcom,s3-debounce = <0x20>;
+
+			pon_1 {
+				qcom,pon-type = <0x00>;
+				qcom,support-reset = <0x01>;
+				qcom,pull-up = <0x01>;
+				qcom,s1-timer = <0x2810>;
+				qcom,s2-timer = <0x7d0>;
+				qcom,s2-type = <0x01>;
+				linux,code = <KEY_POWER>;
+			};
+
+			pon_2 {
+				qcom,pon-type = <0x01>;
+				qcom,support-reset = <0x01>;
+				qcom,pull-up = <0x01>;
+				qcom,s1-timer = <0x00>;
+				qcom,s2-timer = <0x7d0>;
+				qcom,s2-type = <0x01>;
+				linux,code = <0x00>;
+				qcom,use-bark;
+			};
+
+			pon_3 {
+				qcom,pon-type = <0x03>;
+				qcom,support-reset = <0x01>;
+				qcom,s1-timer = <0x1a40>;
+				qcom,s2-timer = <0x7d0>;
+				qcom,s2-type = <0x07>;
+				qcom,pull-up = <0x01>;
+				qcom,use-bark;
+			};
+		};
+
 		charger@1000 {
 			qcom,fast-charge-safe-current = <1500000>;
 			qcom,fast-charge-current-limit = <1500000>;
