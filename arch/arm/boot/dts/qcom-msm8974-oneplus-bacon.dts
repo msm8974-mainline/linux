@@ -553,6 +553,31 @@
 			// reset msmgpio 8
 			// other functions available ?
 		};
+
+		led-controller@36 {
+			compatible = "ti,lm3630a";
+			status = "okay";
+			reg = <0x36>;
+
+			ti,bank-a-ctrl = <0x05>;
+			ti,init-brt-ed1 = <0x50>;
+			ti,init-brt-led2 = <0x50>;
+			ti,max-brt-led1 = <0xff>;
+			ti,max-brt-led2 = <0xff>;
+			ti,pwm-active = <0x00>;
+			ti,pwm-ctrl = <0x00>;
+			ti,pwm-period = <0xff>;
+
+			#address-cells = <1>;
+			#size-cells = <0>;
+
+			led@0 {
+				reg = <0>;
+				led-sources = <0 1>;
+				label = "lcd-backlight";
+				default-brightness = <200>;
+			};
+		};
 	};
 
 	i2c@f9928000 {
