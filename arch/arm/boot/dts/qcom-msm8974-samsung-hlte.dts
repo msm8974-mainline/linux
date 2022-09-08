@@ -31,6 +31,20 @@
 		pinctrl-0 = <&touch_ldo_pin>;
 	};
 
+	vreg_panel: panel-regulator {
+		compatible = "regulator-fixed";
+
+		pinctrl-names = "default";
+		pinctrl-0 = <&panel_en_pin>;
+
+		regulator-name = "panel-vddr-reg";
+		regulator-min-microvolt = <1500000>;
+		regulator-max-microvolt = <1500000>;
+
+		gpio = <&pm8941_gpios 14 GPIO_ACTIVE_HIGH>;
+		enable-active-high;
+	};
+
 	gpio-keys {
 		compatible = "gpio-keys";
 		input-name = "gpio-keys";
@@ -132,7 +146,12 @@
 		compatible = "samsung,s6e3fa0";
 
 		pinctrl-names = "default";
-		pinctrl-0 = <&panel_pin>;
+		pinctrl-0 = <&panel_te_pin &panel_rst_pin>;
+
+		iovdd-supply = <&pm8941_l12>;
+		vddr-supply = <&vreg_panel>;
+
+		reset-gpios = <&pm8941_gpios 19 GPIO_ACTIVE_LOW>;
 
 		port {
 			panel_in: endpoint {
@@ -218,6 +237,22 @@
 		output-high;
 		power-source = <PM8941_GPIO_S3>;
 		qcom,drive-strength = <PMIC_GPIO_STRENGTH_HIGH>;
+	};
+
+	panel_en_pin: panel-en-pin {
+		pins = "gpio14";
+		function = "normal";
+		bias-pull-up;
+		power-source = <PM8941_GPIO_S3>;
+		qcom,drive-strength = <PMIC_GPIO_STRENGTH_LOW>;
+	};
+
+	panel_rst_pin: panel-rst-pin {
+		pins = "gpio19";
+		function = "normal";
+		bias-disable;
+		power-source = <PM8941_GPIO_S3>;
+		qcom,drive-strength = <PMIC_GPIO_STRENGTH_LOW>;
 	};
 };
 
@@ -455,7 +490,7 @@
 		bias-disable;
 	};
 
-	panel_pin: panel {
+	panel_te_pin: panel {
 		pins = "gpio12";
 		function = "mdp_vsync";
 		drive-strength = <2>;
