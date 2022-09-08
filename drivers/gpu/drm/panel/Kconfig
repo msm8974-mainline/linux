@@ -653,6 +653,16 @@ config DRM_PANEL_SAMSUNG_S6D7AA0
 	select DRM_MIPI_DSI
 	select VIDEOMODE_HELPERS
 
+config DRM_PANEL_SAMSUNG_S6E3FA0
+	tristate "Samsung S6E3FA0 DSI command mode panel"
+	depends on OF
+	depends on DRM_MIPI_DSI
+	depends on BACKLIGHT_CLASS_DEVICE
+	help
+	  Say Y here if you want to enable support for Samsung Electronics
+	  S6E3FA0 1080x1920 DSI AMOLED command mode panel. It is used in
+	  Samsung mobile phones like Galaxy Note 3 (hlte).
+
 config DRM_PANEL_SAMSUNG_S6E3FA2_FULL
 	tristate "Samsung S6E3FA2 DSI command mode panel"
 	depends on OF
