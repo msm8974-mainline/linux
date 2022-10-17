@@ -17,7 +17,8 @@
 #include <video/mipi_display.h>
 
 /* Panel ID */
-#define LCD_ID_S6E3FA0		0x414024
+#define LCD_ID_S6E3FA0_1	0x414024
+#define LCD_ID_S6E3FA0_2	0x404024
 
 /* Manufacturer Command Set */
 #define MCS_AID_CONTROL		0xb2  /* Samsung AMOLED Impulsive Driving */
@@ -389,7 +390,8 @@ static int s6e3fa0_verify_panel_id(struct s6e3fa0_ctx *ctx)
 	lcd_id = id1 << 16 | id2 << 8 | id3;
 
 	switch (lcd_id) {
-	case LCD_ID_S6E3FA0:
+	case LCD_ID_S6E3FA0_1:
+	case LCD_ID_S6E3FA0_2:
 		dev_info(&dsi->dev, "detected S6E3FA0 panel (ID: 0x%x)\n",
 			 lcd_id);
 		ctx->seq_data = &seqdata_s6e3fa0;
