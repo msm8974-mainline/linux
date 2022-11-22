@@ -1,0 +1,20 @@
+menu "MSM8974 panel drivers generated with linux-mdss-dsi-panel-driver-generator"
+	depends on GPIOLIB && OF && REGULATOR
+	depends on DRM_MIPI_DSI
+
+config DRM_PANEL_MSM8974_GENERATED
+	tristate "Select all generated MSM8974 panel drivers by default"
+
+config DRM_PANEL_FAIRPHONE_FP2_OTM1902B
+	tristate "Fairphone FP2 OTM1902B"
+	default DRM_PANEL_MSM8974_GENERATED
+
+config DRM_PANEL_FAIRPHONE_FP2_S6D6FA1
+	tristate "Fairphone FP2 S6D6FA1"
+	default DRM_PANEL_MSM8974_GENERATED
+
+config DRM_PANEL_SONY_LEO_NOVATEK_LGD
+	tristate "Sony LEO NOVATEK LGD"
+	default DRM_PANEL_MSM8974_GENERATED
+
+endmenu
