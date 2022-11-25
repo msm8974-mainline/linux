@@ -89,6 +89,37 @@
 &blsp1_i2c2 {
 	status = "okay";
 
+	/*
+	 * FP2 has two display modules, old version has Synaptics S3351
+	 * touchscreen, new version has Ilitek ILI2120 touchscreen.
+	 */
+
+	touchscreen@20 {
+		compatible = "syna,rmi4-i2c";
+		reg = <0x20>;
+
+		interrupts-extended = <&tlmm 28 IRQ_TYPE_LEVEL_LOW>;
+
+		syna,reset-delay-ms = <100>;
+		syna,startup-delay-ms = <160>;
+
+		#address-cells = <1>;
+		#size-cells = <0>;
+
+		status = "disabled";
+
+		rmi4-f01@1 {
+			reg = <0x1>;
+			syna,nosleep-mode = <1>;
+		};
+
+		rmi4-f12@12 {
+			reg = <0x12>;
+			syna,sensor-type = <1>;
+			touchscreen-inverted-y;
+		};
+	};
+
 	touchscreen@41 {
 		compatible = "ilitek,ili2120";
 		reg = <0x41>;
@@ -98,6 +129,8 @@
 
 		touchscreen-size-x = <1080>;
 		touchscreen-size-y = <1920>;
+
+		status = "disabled";
 	};
 };
 
