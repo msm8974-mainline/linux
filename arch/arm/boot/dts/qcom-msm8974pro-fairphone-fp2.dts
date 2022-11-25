@@ -87,7 +87,7 @@
 
 	panel: panel@0 {
 		reg = <0>;
-		compatible = "something,s6d6fa1";
+		compatible = "fairphone,fp2-panel";
 
 		reset-gpios = <&pm8941_gpios 19 GPIO_ACTIVE_LOW>;
 
