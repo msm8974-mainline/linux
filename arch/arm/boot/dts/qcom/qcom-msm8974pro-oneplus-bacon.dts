@@ -291,6 +291,15 @@
 	status = "okay";
 };
 
+/* Broken
+&remoteproc_mss {
+	mss-supply = <&pm8841_s3>;
+	mx-supply = <&pm8841_s1>;
+	pll-supply = <&pm8941_l12>;
+	status = "okay";
+};
+*/
+
 &rpm_requests {
 	regulators-0 {
 		compatible = "qcom,rpm-pm8841-regulators";
