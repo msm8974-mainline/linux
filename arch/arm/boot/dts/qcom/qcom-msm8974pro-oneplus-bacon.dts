@@ -127,7 +127,7 @@
 		};
 	};
 
-	led-controller@36 {
+	backlight: led-controller@36 {
 		compatible = "ti,lm3630a";
 		reg = <0x36>;
 
@@ -188,6 +188,55 @@
 
 &gcc {
 	compatible = "qcom,gcc-msm8974pro-ac";
+};
+
+&gpu {
+	status = "okay";
+};
+
+&mdss {
+	status = "okay";
+};
+
+&mdss_dsi0 {
+	status = "okay";
+
+	vdda-supply = <&pm8941_l2>;
+	vdd-supply = <&pm8941_l22>;
+	vddio-supply = <&pm8941_l12>;
+
+	panel: panel@0 {
+		reg = <0>;
+		compatible = "jdi,lpm055a081ab5";
+
+		vdd-supply = <&pm8941_l22>;
+		vddio-supply = <&pm8941_l12>;
+
+		backlight = <&backlight>;
+
+		enable-gpios = <&tlmm 58 0>;
+		reset-gpios = <&pm8941_gpios 19 0>;
+
+		pinctrl-names = "default";
+		pinctrl-0 = <&panel_pin>;
+
+		port {
+			panel_in: endpoint {
+				remote-endpoint = <&mdss_dsi0_out>;
+			};
+		};
+	};
+};
+
+&mdss_dsi0_out {
+	remote-endpoint = <&panel_in>;
+	data-lanes = <0 1 2 3>;
+};
+
+&mdss_dsi0_phy {
+	status = "okay";
+
+	vddio-supply = <&pm8941_l12>;
 };
 
 &pm8941_coincell {
@@ -483,6 +532,39 @@
 			pins = "sdc1_cmd", "sdc1_data";
 			drive-strength = <4>;
 			bias-pull-up;
+		};
+	};
+
+	panel_pin: panel-state {
+		te-pins {
+			pins = "gpio12";
+			function = "mdp_vsync";
+			drive-strength = <2>;
+			bias-pull-down;
+			input-enable;
+		};
+
+		enable-pins {
+			pins = "gpio58";
+			function = "gpio";
+			drive-strength = <8>;
+			bias-disable;
+			output-high;
+		};
+
+		esd-pins {
+			pins = "gpio28";
+			function = "gpio";
+			drive-strength = <2>;
+			bias-pull-down;
+			input-enable;
+		};
+
+		unk-pins {
+			pins = "gpio62";
+			function = "gpio";
+			bias-disable;
+			output-low;
 		};
 	};
 
