@@ -73,7 +73,35 @@
 
 	status = "okay";
 
-	/* Touchscreen synaptics @ 0x2c */
+	synaptics@2c {
+		compatible = "syna,rmi4-i2c";
+		reg = <0x2c>;
+
+		interrupt-parent = <&tlmm>;
+		interrupts = <86 IRQ_TYPE_EDGE_FALLING>;
+
+		#address-cells = <1>;
+		#size-cells = <0>;
+
+		vdd-supply = <&pm8941_l22>;
+		vio-supply = <&pm8941_s3>;
+
+		pinctrl-0 = <&ts_int_pin>;
+		pinctrl-names = "default";
+
+		syna,startup-delay-ms = <100>;
+
+		rmi-f01@1 {
+			reg = <0x1>;
+			syna,nosleep = <1>;
+		};
+
+		rmi-f11@11 {
+			reg = <0x11>;
+			syna,f11-flip-x = <1>;
+			syna,sensor-type = <1>;
+		};
+	};
 };
 
 &blsp2_i2c5 {
@@ -390,6 +418,14 @@
 			drive-strength = <10>;
 			bias-pull-up;
 		};
+	};
+
+	ts_int_pin: ts-int-pin-state {
+		pins = "gpio86";
+		function = "gpio";
+		drive-strength = <2>;
+		bias-disable;
+		input-enable;
 	};
 };
 
