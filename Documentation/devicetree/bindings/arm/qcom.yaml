@@ -182,6 +182,7 @@ properties:
       - items:
           - enum:
               - fairphone,fp2
+              - htc,m8
               - oneplus,bacon
               - samsung,klte
               - sony,xperia-aries
