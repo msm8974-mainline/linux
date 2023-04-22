@@ -213,6 +213,7 @@ properties:
 
       - items:
           - enum:
+              - htc,m8
               - lge,hammerhead
               - samsung,hlte
               - sony,xperia-amami
