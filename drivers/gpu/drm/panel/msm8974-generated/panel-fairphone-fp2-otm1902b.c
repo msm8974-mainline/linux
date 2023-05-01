@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0-only
-// Copyright (c) 2022 FIXME
+// Copyright (c) 2023 FIXME
 // Generated with linux-mdss-dsi-panel-driver-generator from vendor device tree:
 //   Copyright (c) 2013, The Linux Foundation. All rights reserved. (FIXME)
 
@@ -27,22 +27,6 @@ static inline struct otm1902b *to_otm1902b(struct drm_panel *panel)
 	return container_of(panel, struct otm1902b, panel);
 }
 
-#define dsi_generic_write_seq(dsi, seq...) do {				\
-		static const u8 d[] = { seq };				\
-		int ret;						\
-		ret = mipi_dsi_generic_write(dsi, d, ARRAY_SIZE(d));	\
-		if (ret < 0)						\
-			return ret;					\
-	} while (0)
-
-#define dsi_dcs_write_seq(dsi, seq...) do {				\
-		static const u8 d[] = { seq };				\
-		int ret;						\
-		ret = mipi_dsi_dcs_write_buffer(dsi, d, ARRAY_SIZE(d));	\
-		if (ret < 0)						\
-			return ret;					\
-	} while (0)
-
 static void otm1902b_reset(struct otm1902b *ctx)
 {
 	gpiod_set_value_cansleep(ctx->reset_gpio, 0);
@@ -61,18 +45,18 @@ static int otm1902b_on(struct otm1902b *ctx)
 
 	dsi->mode_flags |= MIPI_DSI_MODE_LPM;
 
-	dsi_generic_write_seq(dsi, 0x00, 0x00);
-	dsi_generic_write_seq(dsi, 0xff, 0x19, 0x02, 0x01, 0x00);
+	mipi_dsi_generic_write_seq(dsi, 0x00, 0x00);
+	mipi_dsi_generic_write_seq(dsi, 0xff, 0x19, 0x02, 0x01, 0x00);
 	usleep_range(1000, 2000);
-	dsi_generic_write_seq(dsi, 0x00, 0x80);
+	mipi_dsi_generic_write_seq(dsi, 0x00, 0x80);
 	usleep_range(1000, 2000);
-	dsi_generic_write_seq(dsi, 0xff, 0x19, 0x02);
+	mipi_dsi_generic_write_seq(dsi, 0xff, 0x19, 0x02);
 	usleep_range(1000, 2000);
-	dsi_dcs_write_seq(dsi, 0x00, 0xb0);
+	mipi_dsi_dcs_write_seq(dsi, 0x00, 0xb0);
 	usleep_range(1000, 2000);
-	dsi_generic_write_seq(dsi, 0xca, 0xff, 0x02, 0x5f, 0x40);
+	mipi_dsi_generic_write_seq(dsi, 0xca, 0xff, 0x02, 0x5f, 0x40);
 	usleep_range(1000, 2000);
-	dsi_dcs_write_seq(dsi, MIPI_DCS_WRITE_CONTROL_DISPLAY, 0x2c);
+	mipi_dsi_dcs_write_seq(dsi, MIPI_DCS_WRITE_CONTROL_DISPLAY, 0x2c);
 	usleep_range(1000, 2000);
 
 	ret = mipi_dsi_dcs_exit_sleep_mode(dsi);
@@ -326,4 +310,4 @@ module_mipi_dsi_driver(otm1902b_driver);
 
 MODULE_AUTHOR("linux-mdss-dsi-panel-driver-generator <fix@me>"); // FIXME
 MODULE_DESCRIPTION("DRM driver for otm1902b 1080p cmd mode dsi panel");
-MODULE_LICENSE("GPL v2");
+MODULE_LICENSE("GPL");
