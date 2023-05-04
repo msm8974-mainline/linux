@@ -570,9 +570,6 @@
 	pinctrl-0 = <&sdc3_on>;
 	pinctrl-names = "default";
 
-	#address-cells = <1>;
-	#size-cells = <0>;
-
 	status = "okay";
 
 	bcrmf@1 {
