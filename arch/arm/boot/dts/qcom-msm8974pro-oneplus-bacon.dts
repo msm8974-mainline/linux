@@ -195,9 +195,9 @@
 };
 
 &dsi0_phy {
-    status = "okay";
+	status = "okay";
 
-    vddio-supply = <&pm8941_l12>;
+	vddio-supply = <&pm8941_l12>;
 };
 
 &gcc {
