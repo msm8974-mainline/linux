@@ -1541,8 +1541,7 @@ err_read_chip_data:
 	return ret;
 }
 
-static int device_fw_load(struct data *ts, const struct firmware *fw,
-	u16 fw_index)
+static int device_fw_load(struct data *ts, const struct firmware *fw)
 {
 	struct device *dev = &ts->client->dev;
 	u16 filesize, file_codesize, loopcounter;
@@ -1619,7 +1618,7 @@ static void validate_fw(struct data *ts)
 	struct device *dev = &ts->client->dev;
 	const struct firmware *fw;
 	u16 config_id, chip_id;
-	int i, ret;
+	int ret;
 	u16 cmd_buf[3];
 	char tmp[MXM_FW_FILENAME_MAX];
 	char filename[MXM_FW_FILENAME_MAX];
@@ -1670,7 +1669,7 @@ set_id:
 
 	mutex_lock(&ts->i2c_mutex);
 	disable_irq(ts->client->irq);
-	if (device_fw_load(ts, fw, i)) {
+	if (device_fw_load(ts, fw)) {
 		release_firmware(fw);
 		dev_err(dev, "firmware download failed");
 		enable_irq(ts->client->irq);
