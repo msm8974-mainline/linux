@@ -100,7 +100,7 @@
 		};
 	};
 
-	led-controller@36 {
+	backlight: led-controller@36 {
 		compatible = "ti,lm3630a";
 		reg = <0x36>;
 
@@ -185,7 +185,7 @@
 		vdd-supply = <&pm8941_l22>;
 		vddio-supply = <&pm8941_l12>;
 
-		// backlight?
+		backlight = <&backlight>;
 
 		enable-gpios = <&tlmm 58 0>;
 		reset-gpios = <&pm8941_gpios 19 0>;
