@@ -38,6 +38,7 @@ dtb-$(CONFIG_ARCH_QCOM) += \
 	qcom-msm8926-motorola-peregrine.dtb \
 	qcom-msm8960-cdp.dtb \
 	qcom-msm8960-samsung-expressatt.dtb \
+	qcom-msm8974-htc-m8.dtb \
 	qcom-msm8974-lge-nexus5-hammerhead.dtb \
 	qcom-msm8974-samsung-hlte.dtb \
 	qcom-msm8974-sony-xperia-rhine-amami.dtb \
