@@ -1502,8 +1502,7 @@ struct qcom_smd_edge *qcom_smd_register_edge(struct device *parent,
 
 	ret = qcom_smd_parse_edge(&edge->dev, node, edge);
 	if (ret) {
-		if (ret != -EPROBE_DEFER)
-			dev_err(&edge->dev, "failed to parse smd edge\n");
+		dev_err(&edge->dev, "failed to parse smd edge\n");
 		goto unregister_dev;
 	}
 
