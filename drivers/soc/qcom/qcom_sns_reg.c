@@ -18,6 +18,8 @@
 #include <linux/soc/qcom/qmi.h>
 #include <linux/workqueue.h>
 
+#include <linux/slab.h>
+
 #define SNS_REG_QMI_SVC_ID		0x010f /* 271 */
 #define SNS_REG_QMI_SVC_V1		2
 #define SNS_REG_QMI_INS_ID		0
