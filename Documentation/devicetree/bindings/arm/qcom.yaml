@@ -206,6 +206,7 @@ properties:
           - enum:
               - lge,hammerhead
               - samsung,hlte
+              - samsung,lt03lte
               - sony,xperia-amami
               - sony,xperia-honami
               - sony,xperia-togari
