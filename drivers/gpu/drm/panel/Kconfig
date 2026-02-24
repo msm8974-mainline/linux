@@ -395,6 +395,16 @@ config DRM_PANEL_LG_SW43408
 	  pixel. It provides a MIPI DSI interface to the host and has a
 	  built-in LED backlight.
 
+config DRM_PANEL_M8_SHARP_NOVATEK_35595
+	tristate "M8 HTC Sharp Novatek 35595 DSI panel"
+	depends on OF
+	depends on DRM_MIPI_DSI
+	depends on BACKLIGHT_CLASS_DEVICE
+	select VIDEOMODE_HELPERS
+	help
+	  DRM panel driver for the HTC M8 Sharp Novatek 35595 command mode panel. This panel receives
+	  video data via DSI.
+
 config DRM_PANEL_MAGNACHIP_D53E6EA8966
 	tristate "Magnachip D53E6EA8966 DSI panel"
 	depends on OF && SPI
