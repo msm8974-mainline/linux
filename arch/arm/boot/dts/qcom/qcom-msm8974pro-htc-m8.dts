@@ -400,7 +400,6 @@
 
 &smbb {
 	status = "okay";
-	monitored-battery = <&bat>;
 };
 
 &tlmm {
