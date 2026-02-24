@@ -4,6 +4,9 @@
 #include "pm8941.dtsi"
 #include <dt-bindings/input/input.h>
 #include <dt-bindings/leds/common.h>
+#include <dt-bindings/pinctrl/qcom,pmic-gpio.h>
+#include <dt-bindings/interrupt-controller/irq.h>
+#include <dt-bindings/power/qcom-rpmpd.h>
 
 / {
 	model = "HTC One (M8)";
@@ -63,6 +66,50 @@
 
 		regulator-always-on;
 	};
+};
+
+&gpu {
+	status = "okay";
+};
+
+&mdss {
+	status = "okay";
+};
+
+&mdss_dsi0 {
+	status = "okay";
+
+	vdd-supply = <&pm8941_l22>;
+	vddio-supply = <&pm8941_l12>;
+	vdda-supply = <&pm8941_l2>;
+	panel@0 {
+		compatible = "mdss,m8-sharp-novatek-35595";
+		reg = <0>;
+		power-supply = <&pm8941_l12>;
+
+		pinctrl-names = "default";
+		pinctrl-0 = <&panel_te_pin>, <&panel_rst_pin>;
+		backlight-gpios = <&pm8941_gpios 4 GPIO_ACTIVE_HIGH>;
+
+		port {
+			panel_in: endpoint {
+				remote-endpoint = <&mdss_dsi0_out>;
+			};
+		};
+	};
+};
+
+&mdss_dsi0_out {
+	data-lanes = <0 1 2 3>;
+	remote-endpoint = <&panel_in>;
+};
+
+&mdss_dsi0_phy {
+	status = "okay";
+
+	vdd-supply = <&pm8941_l22>;
+	vddio-supply = <&pm8941_l12>;
+	vdda-supply = <&pm8941_l2>;
 };
 
 &blsp1_i2c2 {
@@ -353,6 +400,7 @@
 
 &smbb {
 	status = "okay";
+	monitored-battery = <&bat>;
 };
 
 &tlmm {
@@ -397,6 +445,21 @@
 			drive-strength = <6>;
 			bias-pull-down;
 		};
+	};
+
+	panel_te_pin: panel-te-state {
+		pins = "gpio12";
+		function = "mdp_vsync";
+		drive-strength = <2>;
+		bias-disable;
+	};
+
+	panel_rst_pin: panel-rst-state {
+		pins = "gpio13";
+		function = "gpio";
+		bias-disable;
+		power-source = <PM8941_GPIO_S3>;
+		qcom,drive-strength = <PMIC_GPIO_STRENGTH_LOW>;
 	};
 };
 
