@@ -91,6 +91,50 @@
 	};
 };
 
+&blsp2_i2c5 {
+	clock-frequency = <375000>;
+
+	status = "okay";
+
+	magnetometer@c {
+		compatible = "asahi-kasei,ak8963";
+		reg = <0x0c>;
+
+		interrupts-extended = <&tlmm 82 IRQ_TYPE_EDGE_RISING>;
+
+		vdd-supply = <&pm8941_l18>;
+		vid-supply = <&pm8941_lvs1>;
+
+		pinctrl-0 = <&magnetometer_default_state>;
+		pinctrl-names = "default";
+
+		reset-gpios = <&tlmm 81 GPIO_ACTIVE_LOW>;
+
+		mount-matrix = "1", "0", "0",
+			       "0", "-1", "0",
+			       "0", "0", "-1";
+	};
+
+	accelerometer@18 {
+		compatible = "bosch,bmi055_accel";
+		reg = <0x18>;
+
+		interrupts-extended = <&tlmm 86 IRQ_TYPE_EDGE_RISING>,
+				      <&tlmm 49 IRQ_TYPE_EDGE_RISING>;
+		interrupt-names = "INT1", "INT2";
+
+		vdd-supply = <&pm8941_l18>;
+		vddio-supply = <&pm8941_lvs1>;
+
+		pinctrl-0 = <&accelerometer_int_state>;
+		pinctrl-names = "default";
+
+		mount-matrix = "0", "-1", "0",
+			       "-1", "0", "0",
+			       "0", "0", "1";
+	};
+};
+
 &usb {
 	phys = <&usb_hs1_phy>;
 	phy-select = <&tcsr 0xb000 0>;
@@ -371,6 +415,29 @@
 		pins = "gpio35", "gpio36", "gpio37", "gpio38", "gpio39", "gpio40";
 		function = "sdc3";
 		drive-strength = <8>;
+		bias-disable;
+	};
+
+	magnetometer_default_state: magnetometer-default-state {
+		int-pins {
+			pins = "gpio82";
+			function = "gpio";
+			drive-strength = <2>;
+			bias-disable;
+		};
+
+		reset-pins {
+			pins = "gpio81";
+			function = "gpio";
+			drive-strength = <2>;
+			bias-disable;
+		};
+	};
+
+	accelerometer_int_state: accelerometer-int-state {
+		pins = "gpio49", "gpio86";
+		function = "gpio";
+		drive-strength = <2>;
 		bias-disable;
 	};
 };
