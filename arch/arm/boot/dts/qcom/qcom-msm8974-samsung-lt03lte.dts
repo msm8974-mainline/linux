@@ -16,6 +16,8 @@
 };
 
 &blsp2_i2c6 {
+	clock-frequency = <400000>;
+
 	status = "okay";
 
 	fuelgauge@36 {
