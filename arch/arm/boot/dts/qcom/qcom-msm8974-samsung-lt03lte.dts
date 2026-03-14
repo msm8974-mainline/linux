@@ -80,8 +80,7 @@
 		compatible = "maxim,max17050";
 		reg = <0x36>;
 
-		interrupt-parent = <&pm8941_gpios>;
-		interrupts = <26 IRQ_TYPE_EDGE_FALLING>;
+		interrupts-extended = <&pm8941_gpios 26 IRQ_TYPE_EDGE_FALLING>;
 
 		pinctrl-0 = <&fuelgauge_pin>;
 		pinctrl-names = "default";
