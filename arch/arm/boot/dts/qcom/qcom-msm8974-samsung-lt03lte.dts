@@ -133,6 +133,24 @@
 			       "-1", "0", "0",
 			       "0", "0", "1";
 	};
+
+	gyroscope@68 {
+		compatible = "bosch,bmi055_gyro";
+		reg = <0x68>;
+
+		interrupts-extended = <&tlmm 74 IRQ_TYPE_EDGE_RISING>,
+				      <&tlmm 89 IRQ_TYPE_EDGE_RISING>;
+
+		vdd-supply = <&pm8941_l18>;
+		vddio-supply = <&pm8941_lvs1>;
+
+		pinctrl-0 = <&gyroscope_default_state>;
+		pinctrl-names = "default";
+
+		mount-matrix = "0", "-1", "0",
+			       "-1", "0", "0",
+			       "0", "0", "1";
+	};
 };
 
 &usb {
@@ -439,5 +457,21 @@
 		function = "gpio";
 		drive-strength = <2>;
 		bias-disable;
+	};
+
+	gyroscope_default_state: gyroscope-default-state {
+		int-pins {
+			pins = "gpio74";
+			function = "gpio";
+			drive-strength = <2>;
+			bias-disable;
+		};
+
+		data-rdy-pins {
+			pins = "gpio89";
+			function = "gpio";
+			drive-strength = <2>;
+			bias-disable;
+		};
 	};
 };
