@@ -9,6 +9,7 @@
  * TODO: calibscale to correct the lens factor
  */
 #include <linux/module.h>
+#include <linux/delay.h>
 #include <linux/init.h>
 #include <linux/i2c.h>
 #include <linux/mutex.h>
@@ -216,13 +217,20 @@ static const struct iio_info cm3323_info = {
 
 static int cm3323_probe(struct i2c_client *client)
 {
+	struct device *dev = &client->dev;
 	struct cm3323_data *data;
 	struct iio_dev *indio_dev;
 	int ret;
 
-	indio_dev = devm_iio_device_alloc(&client->dev, sizeof(*data));
+	indio_dev = devm_iio_device_alloc(dev, sizeof(*data));
 	if (!indio_dev)
 		return -ENOMEM;
+
+	ret = devm_regulator_get_enable(dev, "vdd");
+	if (ret < 0)
+		return dev_err_probe(dev, ret, "Failed to enable vdd supply\n");
+
+	fsleep(50000);
 
 	data = iio_priv(indio_dev);
 	i2c_set_clientdata(client, indio_dev);
@@ -238,15 +246,15 @@ static int cm3323_probe(struct i2c_client *client)
 
 	ret = cm3323_init(indio_dev);
 	if (ret < 0) {
-		dev_err(&client->dev, "cm3323 chip init failed\n");
+		dev_err(dev, "cm3323 chip init failed\n");
 		return ret;
 	}
 
-	ret = devm_add_action_or_reset(&client->dev, cm3323_disable, indio_dev);
+	ret = devm_add_action_or_reset(dev, cm3323_disable, indio_dev);
 	if (ret < 0)
 		return ret;
 
-	return devm_iio_device_register(&client->dev, indio_dev);
+	return devm_iio_device_register(dev, indio_dev);
 }
 
 static const struct i2c_device_id cm3323_id[] = {
