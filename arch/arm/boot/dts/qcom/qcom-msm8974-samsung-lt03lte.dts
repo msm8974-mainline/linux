@@ -115,6 +115,13 @@
 			       "0", "0", "-1";
 	};
 
+	light-sensor@10 {
+		compatible = "capella,cm3323";
+		reg = <0x10>;
+
+		vdd-supply = <&pm8941_l18>;
+	};
+
 	accelerometer@18 {
 		compatible = "bosch,bmi055_accel";
 		reg = <0x18>;
