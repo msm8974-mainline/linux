@@ -59,8 +59,6 @@ properties:
           - capella,cm32181
             # CM3232: Ambient Light Sensor
           - capella,cm3232
-            # CM3323: Ambient Light Sensor
-          - capella,cm3323
             # Cisco SPI Petra
           - cisco,spi-petra
             # High-Precision Digital Thermometer
