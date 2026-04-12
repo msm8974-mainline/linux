@@ -79,6 +79,17 @@
 
 		vin-supply = <&tsp_sw3_2v8>; /* tsp_sw3_2v8 must be enabled first before AVDD */
 	};
+
+	digitizer_reg: regulator-digitizer {
+		compatible = "regulator-fixed";
+		regulator-name = "digitizer_reg";
+
+		gpio = <&pm8941_gpios 35 GPIO_ACTIVE_HIGH>;
+		enable-active-high;
+
+		pinctrl-0 = <&digitizer_en_pin>;
+		pinctrl-names = "default";
+	};
 };
 
 &blsp1_i2c2 {
@@ -100,6 +111,29 @@
 		reset-gpios = <&pm8941_gpios 9 GPIO_ACTIVE_LOW>;
 		vdda-supply = <&touch_avdd_2v8>;
 		vdd-supply = <&pm8941_l10>;
+	};
+};
+
+&blsp1_i2c6 {
+	clock-frequency = <400000>;
+
+	status = "okay";
+
+	digitizer@56 {
+		compatible = "wacom,w9007a-lt03";
+		reg = <0x56>;
+
+		interrupts-extended = <&tlmm 144 IRQ_TYPE_EDGE_RISING>;
+
+		vdd-supply = <&digitizer_reg>;
+
+		flash-mode-gpios = <&tlmm 44 GPIO_ACTIVE_HIGH>;
+
+		pinctrl-0 = <&stylus_default_state>;
+		pinctrl-names = "default";
+
+		touchscreen-x-mm = <216>;
+		touchscreen-y-mm = <135>;
 	};
 };
 
@@ -458,6 +492,14 @@
 		input-enable;
 		power-source = <PM8941_GPIO_S3>;
 	};
+
+	digitizer_en_pin: digitizer-en-state {
+		pins = "gpio35";
+		function = "normal";
+		bias-disable;
+		output-enable;
+		power-source = <PM8941_GPIO_S3>;
+	};
 };
 
 &tlmm {
@@ -515,6 +557,22 @@
 
 		data-rdy-pins {
 			pins = "gpio89";
+			function = "gpio";
+			drive-strength = <2>;
+			bias-disable;
+		};
+	};
+
+	stylus_default_state: stylus-default-state {
+		fwe-pins {
+			pins = "gpio44";
+			function = "gpio";
+			drive-strength = <2>;
+			bias-disable;
+		};
+
+		int-pins {
+			pins = "gpio144";
 			function = "gpio";
 			drive-strength = <2>;
 			bias-disable;
