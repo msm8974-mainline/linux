@@ -90,6 +90,8 @@
 		compatible = "atmel,maxtouch";
 		reg = <0x4a>;
 
+		linux,keycodes = <KEY_RESERVED KEY_BACK KEY_RESERVED KEY_RESERVED KEY_MENU>;
+
 		interrupts-extended = <&pm8941_gpios 30 IRQ_TYPE_EDGE_FALLING>;
 
 		pinctrl-0 = <&touch_rst_pin &touch_int_pin>;
