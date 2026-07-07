@@ -3,9 +3,9 @@
 #include "pm8841.dtsi"
 #include "pm8941.dtsi"
 #include <dt-bindings/input/input.h>
+#include <dt-bindings/interrupt-controller/irq.h>
 #include <dt-bindings/leds/common.h>
 #include <dt-bindings/pinctrl/qcom,pmic-gpio.h>
-#include <dt-bindings/interrupt-controller/irq.h>
 #include <dt-bindings/power/qcom-rpmpd.h>
 
 / {
@@ -77,19 +77,20 @@
 };
 
 &mdss_dsi0 {
-	status = "okay";
-
 	vdd-supply = <&pm8941_l22>;
 	vddio-supply = <&pm8941_l12>;
 	vdda-supply = <&pm8941_l2>;
+
+	status = "okay";
+
 	panel@0 {
 		compatible = "mdss,m8-sharp-novatek-35595";
 		reg = <0>;
 		power-supply = <&pm8941_l12>;
-
-		pinctrl-names = "default";
-		pinctrl-0 = <&panel_te_pin>, <&panel_rst_pin>;
 		backlight-gpios = <&pm8941_gpios 4 GPIO_ACTIVE_HIGH>;
+
+		pinctrl-0 = <&panel_te_pin>, <&panel_rst_pin>;
+		pinctrl-names = "default";
 
 		port {
 			panel_in: endpoint {
@@ -105,11 +106,11 @@
 };
 
 &mdss_dsi0_phy {
-	status = "okay";
-
 	vdd-supply = <&pm8941_l22>;
 	vddio-supply = <&pm8941_l12>;
 	vdda-supply = <&pm8941_l2>;
+
+	status = "okay";
 };
 
 &blsp1_i2c2 {
