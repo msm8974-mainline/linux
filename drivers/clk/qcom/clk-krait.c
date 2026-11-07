@@ -80,13 +80,28 @@ static u8 krait_mux_get_parent(struct clk_hw *hw)
 {
 	struct krait_mux_clk *mux = to_krait_mux_clk(hw);
 	u32 sel;
+	int index;
 
 	sel = krait_get_l2_indirect_reg(mux->offset);
 	sel >>= mux->shift;
 	sel &= mux->mask;
 	mux->en_mask = sel;
 
-	return clk_mux_val_to_index(hw, mux->parent_map, 0, sel);
+	index = clk_mux_val_to_index(hw, mux->parent_map, 0, sel);
+	if (index < 0) {
+		/*
+		 * The hardware holds a selector this mux has no mapping for.
+		 * Returning the error through the u8 return type would turn
+		 * -EINVAL into index 234, which callers then feed back to
+		 * .set_parent and into parent_map[] - far out of bounds of a
+		 * two or three entry table. Report the safe parent instead.
+		 */
+		pr_warn_once("%s: unmapped mux selector %u, assuming safe parent\n",
+			     clk_hw_get_name(hw), sel);
+		return mux->safe_sel;
+	}
+
+	return index;
 }
 
 const struct clk_ops krait_mux_clk_ops = {

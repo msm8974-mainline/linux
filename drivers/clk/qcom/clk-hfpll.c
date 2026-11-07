@@ -76,16 +76,19 @@ static void __clk_hfpll_enable(struct clk_hw *hw)
 	regmap_update_bits(regmap, hd->mode_reg, PLL_RESET_N, PLL_RESET_N);
 
 	/* Wait for PLL to lock. */
-	if (hd->status_reg)
-		/*
-		 * Busy wait. Should never timeout, we add a timeout to
-		 * prevent any sort of stall.
-		 */
-		regmap_read_poll_timeout(regmap, hd->status_reg, val,
-					 !(val & BIT(hd->lock_bit)), 0,
-					 100 * USEC_PER_MSEC);
-	else
+	if (hd->status_reg) {
+		if (regmap_read_poll_timeout_atomic(regmap, hd->status_reg, val,
+						    val & BIT(hd->lock_bit),
+						    1, 200)) {
+			u32 l_val = 0;
+
+			regmap_read(regmap, hd->l_reg, &l_val);
+			WARN_ONCE(1, "%s failed to lock in 200 us (L_VAL %u)\n",
+				  clk_hw_get_name(hw), l_val);
+		}
+	} else {
 		udelay(60);
+	}
 
 	/* Enable PLL output. */
 	regmap_update_bits(regmap, hd->mode_reg, PLL_OUTCTRL, PLL_OUTCTRL);

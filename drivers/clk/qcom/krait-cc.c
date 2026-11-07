@@ -2,6 +2,7 @@
 // Copyright (c) 2018, The Linux Foundation. All rights reserved.
 
 #include <linux/kernel.h>
+#include <linux/delay.h>
 #include <linux/init.h>
 #include <linux/module.h>
 #include <linux/platform_device.h>
@@ -52,11 +53,11 @@ static int krait_notifier_cb(struct notifier_block *nb,
 		ret = krait_mux_clk_ops.set_parent(&mux->hw, mux->safe_sel);
 		mux->reparent = false;
 	/*
-	 * By the time POST_RATE_CHANGE notifier is called,
-	 * clk framework itself would have changed the parent for the new rate.
-	 * Only otherwise, put back to the old parent.
+	 * ABORT_RATE_CHANGE has to be handled the same way: the core sends it
+	 * when any notifier fails PRE, and without restoring the parent here
+	 * the CPU (or the L2) is left on the safe parent permanently.
 	 */
-	} else if (event == POST_RATE_CHANGE) {
+	} else if (event == POST_RATE_CHANGE || event == ABORT_RATE_CHANGE) {
 		if (!mux->reparent)
 			ret = krait_mux_clk_ops.set_parent(&mux->hw,
 							   mux->old_index);
@@ -145,9 +146,15 @@ krait_add_sec_mux(struct device *dev, int id, const char *s,
 {
 	int cpu, ret;
 	struct krait_mux_clk *mux;
+	/*
+	 * Parent order must line up with sec_mux_map: the hardware select
+	 * value for the aux source is 2 and for QSB is 0 (the vendor's
+	 * clock-krait-8974 MUX_SRC_LIST is the register-level reference).
+	 * The aux entry (index 0) is filled in below.
+	 */
 	static struct clk_parent_data sec_mux_list[2] = {
-		{ .name = "qsb", .fw_name = "qsb" },
 		{},
+		{ .name = "qsb", .fw_name = "qsb" },
 	};
 	struct clk_init_data init = {
 		.parent_data = sec_mux_list,
@@ -188,10 +195,11 @@ krait_add_sec_mux(struct device *dev, int id, const char *s,
 			clk = ERR_PTR(-ENOMEM);
 			goto err_aux;
 		}
-		sec_mux_list[1].fw_name = parent_name;
-		sec_mux_list[1].name = parent_name;
+		sec_mux_list[0].fw_name = parent_name;
+		sec_mux_list[0].name = parent_name;
 	} else {
-		sec_mux_list[1].name = "apu_aux";
+		sec_mux_list[0].name = "acpu_aux";
+		sec_mux_list[0].fw_name = "acpu_aux";
 	}
 
 	ret = devm_clk_hw_register(dev, &mux->hw);
@@ -343,6 +351,82 @@ static const struct of_device_id krait_cc_match_table[] = {
 };
 MODULE_DEVICE_TABLE(of, krait_cc_match_table);
 
+/*
+ * KPSS APC power-gate sequencer + MDD bandgap configuration.
+ *
+ * The per-core APC power-gate hardware (head-switch sequencer and the MDD
+ * bandgap that references the core LDO) comes out of the boot chain
+ * completely unprogrammed on msm8974 (all registers read 0x0), and nothing
+ * in the mainline stack ever configures it.  The downstream
+ * krait-regulator driver programs it at probe, before any CPU rail
+ * movement (kvreg_hw_init()/glb_init()), and treats that as a hard
+ * prerequisite: with the sequencer unconfigured, gang-rail voltage swings
+ * driven by cpufreq silently reset the SoC (PS_HOLD, no console output)
+ * within minutes once cores are under load.
+ *
+ * Program the vendor values here, before the CPU clocks are registered,
+ * so that no cpufreq transition can ever precede this configuration.
+ * BHS-only static mode is used (no core LDO), which is the mode the
+ * running vendor stack keeps whenever core voltages exceed 850 mV.
+ *
+ * The addresses are SoC-fixed for the KPSS subsystem; a proper binding
+ * (qcom,krait-apc) would be needed for an upstream submission.
+ */
+#define KPSS_GCC_PHYS		0xf9011000
+#define KPSS_GCC_SIZE		0x1000
+#define KPSS_GCC_VERSION	0xfd0
+#define KPSS_PWR_GATE_CONFIG	0x044
+#define KPSS_VERSION_2P0	0x20000000
+
+#define KRAIT_ACS_PHYS(cpu)	(0xf9088000 + 0x10000 * (cpu))
+#define KRAIT_ACS_SIZE		0x3000
+#define APC_PWR_GATE_MODE	0x1c
+#define APC_PWR_GATE_DLY	0x20
+#define APC_MDD_CONFIG_CTL	0x2800
+#define APC_MDD_MODE		0x2810
+
+static void krait_apc_hw_init(struct device *dev)
+{
+	void __iomem *gcc, *acs;
+	u32 version;
+	int cpu;
+
+	gcc = ioremap(KPSS_GCC_PHYS, KPSS_GCC_SIZE);
+	if (!gcc) {
+		dev_warn(dev, "APC: cannot map KPSS GCC, power-gate config skipped\n");
+		return;
+	}
+	version = readl_relaxed(gcc + KPSS_GCC_VERSION);
+	writel_relaxed(version > KPSS_VERSION_2P0 ? 0x0308736e : 0x0008736e,
+		       gcc + KPSS_PWR_GATE_CONFIG);
+	mb();
+	iounmap(gcc);
+
+	for_each_possible_cpu(cpu) {
+		acs = ioremap(KRAIT_ACS_PHYS(cpu), KRAIT_ACS_SIZE);
+		if (!acs) {
+			dev_warn(dev, "APC: cannot map CPU%d ACS\n", cpu);
+			continue;
+		}
+		/* MDD bandgap that references the LDO, then enable MDD */
+		writel_relaxed(0x00000190, acs + APC_MDD_CONFIG_CTL);
+		writel_relaxed(0x00000002, acs + APC_MDD_MODE);
+		mb();
+		udelay(5);
+		if (version > KPSS_VERSION_2P0) {
+			/* hardware sequencer delays, then enable it in BHS mode */
+			writel_relaxed(0x30430600, acs + APC_PWR_GATE_DLY);
+			writel_relaxed(0x00000021, acs + APC_PWR_GATE_MODE);
+			mb();
+			udelay(1);
+		}
+		iounmap(acs);
+	}
+
+	dev_info(dev, "APC power-gate sequencer configured (KPSS %08x, BHS)\n",
+		 version);
+}
+
 static int krait_cc_probe(struct platform_device *pdev)
 {
 	struct device *dev = &pdev->dev;
@@ -351,6 +435,9 @@ static int krait_cc_probe(struct platform_device *pdev)
 	struct clk_hw *mux, *l2_pri_mux;
 	struct clk *clk, **clks;
 	bool unique_aux = !!device_get_match_data(dev);
+
+	if (!unique_aux)	/* msm8974 family (krait-cc-v2) */
+		krait_apc_hw_init(dev);
 
 	/* Rate is 1 because 0 causes problems for __clk_mux_determine_rate */
 	clk = clk_register_fixed_rate(dev, "qsb", NULL, 0, 1);
@@ -362,6 +449,7 @@ static int krait_cc_probe(struct platform_device *pdev)
 						"gpll0_vote", 0, 1, 2);
 		if (IS_ERR(clk))
 			return PTR_ERR(clk);
+		clk_prepare_enable(clk);
 	}
 
 	/* Krait configurations have at most 4 CPUs and one L2 */

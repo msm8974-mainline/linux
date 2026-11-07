@@ -404,6 +404,12 @@ static const struct qcom_cpufreq_match_data match_data_krait = {
 	.get_version = qcom_cpufreq_krait_name_version,
 };
 
+static const struct qcom_cpufreq_match_data match_data_msm8974 = {
+	.get_version = qcom_cpufreq_krait_name_version,
+	.pd_names = (const char *[]) { "cx" },
+	.num_pd_names = 1,
+};
+
 static const struct qcom_cpufreq_match_data match_data_msm8909 = {
 	.get_version = qcom_cpufreq_simple_get_version,
 	.pd_names = (const char *[]) { "perf" },
@@ -596,7 +602,7 @@ static const struct of_device_id qcom_cpufreq_match_list[] __initconst __maybe_u
 	{ .compatible = "qcom,ipq8074", .data = &match_data_ipq8074 },
 	{ .compatible = "qcom,apq8064", .data = &match_data_krait },
 	{ .compatible = "qcom,ipq9574", .data = &match_data_kryo },
-	{ .compatible = "qcom,msm8974", .data = &match_data_krait },
+	{ .compatible = "qcom,msm8974", .data = &match_data_msm8974 },
 	{ .compatible = "qcom,msm8960", .data = &match_data_krait },
 	{},
 };

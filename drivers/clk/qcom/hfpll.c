@@ -83,13 +83,32 @@ static const struct hfpll_data msm8976_cci = {
 	.max_rate = 902400000UL,
 };
 
+static const struct hfpll_data msm8974 = {
+	.mode_reg = 0x00,
+	.l_reg = 0x04,
+	.m_reg = 0x08,
+	.n_reg = 0x0c,
+	.user_reg = 0x10,
+	.config_reg = 0x14,
+	.config_val = 0x04d0405d,
+	.status_reg = 0x1c,
+	.lock_bit = 16,
+
+	.l_val = 0x1c,
+	.user_val = 0x8,
+	.user_vco_mask = 0x100000,
+	.low_vco_max_rate = 1248000000,
+	.min_rate = 537600000UL,
+	.max_rate = 2900000000UL,
+};
+
 static const struct of_device_id qcom_hfpll_match_table[] = {
+	{ .compatible = "qcom,msm8974-hfpll", .data = &msm8974 },
+	{ .compatible = "qcom,hfpll", .data = &msm8974 },
 	{ .compatible = "qcom,msm8976-hfpll-a53", .data = &msm8976_a53 },
 	{ .compatible = "qcom,msm8976-hfpll-a72", .data = &msm8976_a72 },
 	{ .compatible = "qcom,msm8976-hfpll-cci", .data = &msm8976_cci },
 	{ .compatible = "qcom,qcs404-hfpll", .data = &qcs404 },
-	/* Deprecated in bindings */
-	{ .compatible = "qcom,hfpll", .data = &qcs404 },
 	{ }
 };
 MODULE_DEVICE_TABLE(of, qcom_hfpll_match_table);

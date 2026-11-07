@@ -7,6 +7,9 @@
  */
 
 #include <linux/bitfield.h>
+#include <linux/debugfs.h>
+#include <linux/seq_file.h>
+#include <linux/delay.h>
 #include <linux/err.h>
 #include <linux/init.h>
 #include <linux/io.h>
@@ -39,6 +42,22 @@
 #define SPM_1_1_AVS_CTL_AVS_ENABLED	BIT(27)
 #define SPM_AVS_CTL_MAX_VLVL		GENMASK(22, 17)
 #define SPM_AVS_CTL_MIN_VLVL		GENMASK(15, 10)
+
+/* SAW2 v2.1 specific definitions */
+#define SPM_2_1_VCTL_VLVL		GENMASK(7, 0)
+#define SPM_2_1_VCTL_PORT		GENMASK(18, 16)
+#define SPM_2_1_AVS_CTL_AVS_ENABLED	BIT(0)
+#define SPM_2_1_PMIC_STS_CURR_VLVL	GENMASK(7, 0)
+#define SPM_2_1_PMIC_STS_STATE		GENMASK(17, 16)
+
+/*
+ * The gang-rail SAW2 also carries the SMPS phase count (VCTL port 1) and
+ * FTS mode (VCTL port 2); the data byte for port 2 selects PFM (0x00) or
+ * PWM (0x80).
+ */
+#define SPM_SAW_PHASE_PORT		1
+#define SPM_SAW_FTS_PORT		2
+#define SPM_FTS_PWM			0x80
 
 enum spm_reg {
 	SPM_REG_CFG,
@@ -83,8 +102,33 @@ struct spm_driver_data {
 	void __iomem *reg_base;
 	const struct spm_reg_data *reg_data;
 	struct device *dev;
+	/*
+	 * volt_sel_req is the selector a set_vdd() call must program;
+	 * volt_sel is the last selector CONFIRMED by the PMIC handshake and
+	 * is what get_voltage_sel() reports.  They must stay separate: if a
+	 * failed write updated volt_sel, the regulator core's retry would
+	 * compare the request against the poisoned cache, skip the hardware
+	 * write AND the ramp delay, and report success - after which the OPP
+	 * core raises the CPU clock against a rail that never moved.
+	 */
 	unsigned int volt_sel;
+	unsigned int volt_sel_req;
+	/*
+	 * Counters for the rail handshake, exposed through debugfs.  A failed
+	 * handshake is the one event on this platform that is known to end in
+	 * a silent reset when software then clocks the CPU against a rail that
+	 * did not move, so it must be countable rather than only appearing as
+	 * a rate-limited log line.
+	 */
+	unsigned int vdd_writes;
+	unsigned int vdd_timeouts;
+	struct dentry *debugfs;
 	int reg_cpu;
+	/*
+	 * set_vdd() cannot return a value (it is an smp_call_func_t), so it
+	 * records the outcome here for spm_set_voltage_sel() to propagate.
+	 */
+	int set_vdd_ret;
 };
 
 static const u16 spm_reg_offset_v4_1[SPM_REG_NR] = {
@@ -194,7 +238,43 @@ static const u16 spm_reg_offset_v2_1[SPM_REG_NR] = {
 	[SPM_REG_SEQ_ENTRY]	= 0x80,
 };
 
-/* SPM register data for 8974, 8084 */
+/* Extended v2.1 offset table with voltage control registers for 8974/8084 */
+static const u16 spm_reg_offset_v2_1_cpu[SPM_REG_NR] = {
+	[SPM_REG_CFG]		= 0x08,
+	[SPM_REG_STS0]		= 0x0C,
+	[SPM_REG_PMIC_STS]	= 0x14,
+	[SPM_REG_RST]		= 0x18,
+	[SPM_REG_VCTL]		= 0x1C,
+	[SPM_REG_AVS_CTL]	= 0x20,
+	[SPM_REG_AVS_LIMIT]	= 0x24,
+	[SPM_REG_SPM_CTL]	= 0x30,
+	[SPM_REG_DLY]		= 0x34,
+	[SPM_REG_PMIC_DATA_0]	= 0x40,
+	[SPM_REG_PMIC_DATA_1]	= 0x44,
+	[SPM_REG_SEQ_ENTRY]	= 0x80,
+};
+
+static void smp_set_vdd_v1_1(void *data);
+
+static struct linear_range spm_v1_1_regulator_range =
+	REGULATOR_LINEAR_RANGE(700000, 0, 56, 12500);
+
+/*
+ * The selector written to VCTL[7:0] is the raw FTS2 setpoint, zero-based
+ * from 0 V in 5 mV steps; the usable range is 350 mV (70) to 1.275 V (255).
+ */
+static struct linear_range spm_v2_1_regulator_range =
+	REGULATOR_LINEAR_RANGE(350000, 70, 255, 5000);
+
+/*
+ * SPM register data for 8974, 8084 per-CPU.
+ *
+ * These SAWs run idle/sleep sequences only: on MSM8974 the L2/APCS SAW is the
+ * one wired to the PMIC over SPMI, and the vendor accordingly gives its per-CPU
+ * nodes no pmic-data at all.  Use the plain v2.1 offset table so PMIC_DATA_0/1
+ * are not even mapped here - the extended table plus a PMIC payload would let a
+ * per-CPU sequencer drive the shared Krait rail behind the regulator's back.
+ */
 static const struct spm_reg_data spm_reg_8974_8084_cpu  = {
 	.reg_offset = spm_reg_offset_v2_1,
 	.spm_cfg = 0x1,
@@ -204,6 +284,29 @@ static const struct spm_reg_data spm_reg_8974_8084_cpu  = {
 		0x0F },
 	.start_index[PM_SLEEP_MODE_STBY] = 0,
 	.start_index[PM_SLEEP_MODE_SPC] = 3,
+};
+
+static void smp_set_vdd_v2_1_l2(void *data);
+
+/*
+ * SPM register data for 8974, 8084 L2/APCS master SAW2.
+ * On MSM8974, only the L2 SAW2 is connected to the PMIC via SPMI for
+ * voltage control.  Per-CPU SAW2 units handle only idle/sleep sequences.
+ * The L2 SAW2 controls the shared Krait voltage rail (gang supply).
+ */
+static const struct spm_reg_data spm_reg_8974_8084_l2  = {
+	.reg_offset = spm_reg_offset_v2_1_cpu,
+	.spm_cfg = 0x14,
+	.spm_dly = 0x3C102800,
+	.pmic_data[0] = 0x02030080,
+	.pmic_data[1] = 0x00030000,
+	.seq = { 0x1F, 0x00, 0x03, 0x00, 0x0F },
+	.start_index[PM_SLEEP_MODE_STBY] = 0,
+	.start_index[PM_SLEEP_MODE_SPC] = 0,
+	.set_vdd = smp_set_vdd_v2_1_l2,
+	.range = &spm_v2_1_regulator_range,
+	.init_uV = 1100000,
+	.ramp_delay = 1250,
 };
 
 /* SPM register data for 8226 */
@@ -230,12 +333,6 @@ static const u16 spm_reg_offset_v1_1[SPM_REG_NR] = {
 	[SPM_REG_PMIC_DATA_1]	= 0x2C,
 	[SPM_REG_SEQ_ENTRY]	= 0x80,
 };
-
-static void smp_set_vdd_v1_1(void *data);
-
-/* SPM register data for 8064 */
-static struct linear_range spm_v1_1_regulator_range =
-	REGULATOR_LINEAR_RANGE(700000, 0, 56, 12500);
 
 static const struct spm_reg_data spm_reg_8064_cpu = {
 	.reg_offset = spm_reg_offset_v1_1,
@@ -287,30 +384,76 @@ static inline u32 spm_register_read(struct spm_driver_data *drv,
 	return readl_relaxed(drv->reg_base + drv->reg_data->reg_offset[reg]);
 }
 
+static DEFINE_RAW_SPINLOCK(spm_lock);
+
 void spm_set_low_power_mode(struct spm_driver_data *drv,
 			    enum pm_sleep_mode mode)
 {
+	unsigned long flags;
 	u32 start_index;
 	u32 ctl_val;
 
 	start_index = drv->reg_data->start_index[mode];
 
+	raw_spin_lock_irqsave(&spm_lock, flags);
 	ctl_val = spm_register_read(drv, SPM_REG_SPM_CTL);
 	ctl_val &= ~(SPM_CTL_INDEX << SPM_CTL_INDEX_SHIFT);
 	ctl_val |= start_index << SPM_CTL_INDEX_SHIFT;
 	ctl_val |= SPM_CTL_EN;
 	spm_register_write_sync(drv, SPM_REG_SPM_CTL, ctl_val);
+	raw_spin_unlock_irqrestore(&spm_lock, flags);
 }
 
 static int spm_set_voltage_sel(struct regulator_dev *rdev, unsigned int selector)
 {
 	struct spm_driver_data *drv = rdev_get_drvdata(rdev);
+	unsigned long flags;
 
-	drv->volt_sel = selector;
+	drv->volt_sel_req = selector;
+	drv->set_vdd_ret = 0;
+	drv->vdd_writes++;
 
-	/* Always do the SAW register writes on the corresponding CPU */
-	return smp_call_function_single(drv->reg_cpu, drv->reg_data->set_vdd, drv, true);
+	if (drv->reg_cpu >= 0) {
+		int ret = smp_call_function_single(drv->reg_cpu,
+						  drv->reg_data->set_vdd,
+						  drv, true);
+		return ret ? : drv->set_vdd_ret;
+	}
+
+	/*
+	 * Run the L2/APCS gang-rail write (RST kick -> VCTL -> PMIC_STS poll)
+	 * under spm_lock with interrupts disabled.  This rail has no
+	 * associated CPU (reg_cpu < 0) so set_vdd() executes in the caller's
+	 * context on an arbitrary CPU.  Taking spm_lock serializes this write
+	 * against any sibling core entering or exiting cpuidle power-collapse
+	 * (spm_set_low_power_mode), preventing concurrent SPM state-machine
+	 * corruption on the shared APCS/PMIC bus.
+	 */
+	raw_spin_lock_irqsave(&spm_lock, flags);
+	drv->reg_data->set_vdd(drv);
+	raw_spin_unlock_irqrestore(&spm_lock, flags);
+
+	/*
+	 * Propagate a failed rail write.  Without this the OPP core sees
+	 * success and goes on to raise the clock, so a rail that never reached
+	 * the requested level is followed by a frequency the silicon has not
+	 * been given the voltage for.  The vendor driver returns -EIO here and
+	 * aborts the transition for the same reason.
+	 */
+	return drv->set_vdd_ret;
 }
+
+static int spm_stats_show(struct seq_file *s, void *data)
+{
+	struct spm_driver_data *drv = s->private;
+
+	seq_printf(s, "vdd_writes   %u\n", drv->vdd_writes);
+	seq_printf(s, "vdd_timeouts %u\n", drv->vdd_timeouts);
+	seq_printf(s, "volt_sel     %u (confirmed)\n", drv->volt_sel);
+	seq_printf(s, "volt_sel_req %u (last requested)\n", drv->volt_sel_req);
+	return 0;
+}
+DEFINE_SHOW_ATTRIBUTE(spm_stats);
 
 static int spm_get_voltage_sel(struct regulator_dev *rdev)
 {
@@ -333,7 +476,7 @@ static void smp_set_vdd_v1_1(void *data)
 	unsigned int vlevel, volt_sel;
 	bool avs_enabled;
 
-	volt_sel = drv->volt_sel;
+	volt_sel = drv->volt_sel_req;
 	vlevel = volt_sel | 0x80; /* band */
 
 	avs_ctl = spm_register_read(drv, SPM_REG_AVS_CTL);
@@ -368,6 +511,7 @@ static void smp_set_vdd_v1_1(void *data)
 		dev_err_ratelimited(drv->dev, "timeout setting the voltage (%x %x)!\n", sts, vlevel);
 		goto enable_avs;
 	}
+	drv->volt_sel = volt_sel;
 
 	if (avs_enabled) {
 		unsigned int max_avs = volt_sel;
@@ -383,6 +527,99 @@ enable_avs:
 		avs_ctl |= SPM_1_1_AVS_CTL_AVS_ENABLED;
 		spm_register_write(drv, SPM_REG_AVS_CTL, avs_ctl);
 	}
+}
+
+
+/*
+ * Write one of the L2 SAW2's non-voltage PMIC ports: the SMPS phase count on
+ * port 1, the FTS mode on port 2.  Unlike the voltage port (0) these do not
+ * update PMIC_STS[7:0], so completion is confirmed by waiting for the PMIC FSM
+ * to return to idle (PMIC_STS[17:16] == 0), as the vendor does.  The next
+ * voltage write clears the port field back to 0.
+ */
+static int spm_saw_write_pmic_port(struct spm_driver_data *drv, u32 port,
+				   u32 data)
+{
+	unsigned int vctl, pmic_sts;
+
+	vctl = spm_register_read(drv, SPM_REG_VCTL);
+	vctl &= ~(SPM_2_1_VCTL_VLVL | SPM_2_1_VCTL_PORT);
+	vctl |= FIELD_PREP(SPM_2_1_VCTL_PORT, port) | (data & 0xff);
+	spm_register_write(drv, SPM_REG_VCTL, vctl);
+
+	return read_poll_timeout_atomic(spm_register_read, pmic_sts,
+					!(pmic_sts & SPM_2_1_PMIC_STS_STATE),
+					1, 200, false, drv, SPM_REG_PMIC_STS);
+}
+
+/*
+ * smp_set_vdd_v2_1_l2 - Set voltage via L2/APCS SAW2 (MSM8974 gang supply).
+ *
+ * On MSM8974 only the L2 SAW2 at 0xf9012000 is wired to the PMIC via SPMI.
+ * This function is called directly (not via smp_call_function_single) because
+ * L2 SAW2 MMIO is bus-accessible from any CPU.
+ */
+static void smp_set_vdd_v2_1_l2(void *data)
+{
+	struct spm_driver_data *drv = data;
+	unsigned int vctl, avs_ctl, pmic_sts;
+	unsigned int vlevel, volt_sel;
+	bool avs_enabled;
+
+	volt_sel = drv->volt_sel_req;
+	vlevel = volt_sel;
+
+	avs_ctl = spm_register_read(drv, SPM_REG_AVS_CTL);
+	avs_enabled = avs_ctl & SPM_2_1_AVS_CTL_AVS_ENABLED;
+
+	if (avs_enabled) {
+		avs_ctl &= ~SPM_2_1_AVS_CTL_AVS_ENABLED;
+		spm_register_write(drv, SPM_REG_AVS_CTL, avs_ctl);
+	}
+
+	spm_register_write(drv, SPM_REG_RST, 1);
+
+	vctl = spm_register_read(drv, SPM_REG_VCTL);
+
+	/*
+	 * PORT must be 0 (the vctl port): nonzero ports route the data byte
+	 * to the PMIC phase/PFM controls instead of the voltage setpoint,
+	 * and PMIC_STS only reflects writes made through port 0.
+	 */
+	vctl &= ~(SPM_2_1_VCTL_VLVL | SPM_2_1_VCTL_PORT);
+	vctl |= vlevel;
+
+	spm_register_write(drv, SPM_REG_VCTL, vctl);
+
+	/*
+	 * Wait for the PMIC arbiter to latch the new setpoint.  The analog
+	 * ramp is waited out by the regulator core via ramp_delay.
+	 */
+	if (read_poll_timeout_atomic(spm_register_read,
+				     pmic_sts,
+				     (pmic_sts & SPM_2_1_PMIC_STS_CURR_VLVL) == vlevel,
+				     1, 200, false,
+				     drv, SPM_REG_PMIC_STS)) {
+		dev_err_ratelimited(drv->dev, "timeout setting the voltage (%x %x)!\n",
+				    pmic_sts & 0xff, vlevel);
+		drv->set_vdd_ret = -ETIMEDOUT;
+		drv->vdd_timeouts++;
+		return;
+	}
+
+	/*
+	 * AVS is left disabled deliberately.  It is off by design on this SoC:
+	 * the vendor programs AVS_CTL/AVS_LIMIT to zero on every SAW at init
+	 * and never arms it.  The window this code used to rebuild cannot even
+	 * be expressed in the registers it writes - MIN_VLVL and MAX_VLVL are
+	 * 6 bits wide, inherited from v1.1 whose selectors fit, while a v2.1
+	 * selector reaches 255, so a window built from one is silently
+	 * truncated: selector 180 (900 mV) becomes 48 (240 mV), authorising the
+	 * hardware to track the shared Krait rail down to an arbitrary level
+	 * with no software involvement.
+	 */
+	drv->volt_sel = volt_sel;
+	drv->set_vdd_ret = 0;
 }
 
 static int spm_get_cpu(struct device *dev)
@@ -441,18 +678,20 @@ static int spm_register_regulator(struct device *dev, struct spm_driver_data *dr
 	rdesc->ramp_delay = drv->reg_data->ramp_delay;
 
 	ret = spm_get_cpu(dev);
-	if (ret < 0)
-		return ret;
+	if (ret >= 0) {
+		drv->reg_cpu = ret;
+		dev_dbg(dev, "SAW2 regulator bound to CPU %d\n", drv->reg_cpu);
+	} else {
+		drv->reg_cpu = -1;
+		dev_dbg(dev, "SAW2 L2 regulator (shared rail)\n");
+	}
 
-	drv->reg_cpu = ret;
-	dev_dbg(dev, "SAW2 bound to CPU %d\n", drv->reg_cpu);
+	if (IS_ENABLED(CONFIG_DEBUG_FS)) {
+		drv->debugfs = debugfs_create_dir(dev_name(dev), NULL);
+		debugfs_create_file("rail", 0444, drv->debugfs, drv,
+				    &spm_stats_fops);
+	}
 
-	/*
-	 * Program initial voltage, otherwise registration will also try
-	 * setting the voltage, which might result in undervolting the CPU.
-	 */
-	drv->volt_sel = DIV_ROUND_UP(drv->reg_data->init_uV - rdesc->min_uV,
-				     rdesc->uV_step);
 	ret = linear_range_get_selector_high(drv->reg_data->range,
 					     drv->reg_data->init_uV,
 					     &drv->volt_sel,
@@ -461,9 +700,20 @@ static int spm_register_regulator(struct device *dev, struct spm_driver_data *dr
 		dev_err(dev, "Initial uV value out of bounds\n");
 		return ret;
 	}
+	drv->volt_sel_req = drv->volt_sel;
 
-	/* Always do the SAW register writes on the corresponding CPU */
-	smp_call_function_single(drv->reg_cpu, drv->reg_data->set_vdd, drv, true);
+	/*
+	 * Program initial voltage to hardware so the SAW2 VCTL register
+	 * matches the value we report via get_voltage_sel.
+	 */
+	if (drv->reg_data->set_vdd) {
+		if (drv->reg_cpu >= 0)
+			smp_call_function_single(drv->reg_cpu,
+						 drv->reg_data->set_vdd,
+						 drv, true);
+		else
+			drv->reg_data->set_vdd(drv);
+	}
 
 	rdev = devm_regulator_register(dev, rdesc, &config);
 	if (IS_ERR(rdev)) {
@@ -489,6 +739,8 @@ static const struct of_device_id spm_match_table[] = {
 	  .data = &spm_reg_8939_cpu },
 	{ .compatible = "qcom,msm8974-saw2-v2.1-cpu",
 	  .data = &spm_reg_8974_8084_cpu },
+	{ .compatible = "qcom,msm8974-saw2-v2.1-l2",
+	  .data = &spm_reg_8974_8084_l2 },
 	{ .compatible = "qcom,msm8976-gold-saw2-v2.3-l2",
 	  .data = &spm_reg_8976_gold_l2 },
 	{ .compatible = "qcom,msm8976-silver-saw2-v2.3-l2",
@@ -538,8 +790,15 @@ static int spm_dev_probe(struct platform_device *pdev)
 	 * CPU was held in reset, the reset signal could trigger the SPM state
 	 * machine, before the sequences are completely written.
 	 */
-	spm_register_write(drv, SPM_REG_AVS_CTL, drv->reg_data->avs_ctl);
-	spm_register_write(drv, SPM_REG_AVS_LIMIT, drv->reg_data->avs_limit);
+	/*
+	 * Write these whenever the SoC maps them, rather than only when the
+	 * value is nonzero: zero is a meaningful value here - it means "AVS
+	 * off" - and skipping it leaves whatever the bootloader armed in place.
+	 */
+	if (drv->reg_data->reg_offset[SPM_REG_AVS_CTL])
+		spm_register_write(drv, SPM_REG_AVS_CTL, drv->reg_data->avs_ctl);
+	if (drv->reg_data->reg_offset[SPM_REG_AVS_LIMIT])
+		spm_register_write(drv, SPM_REG_AVS_LIMIT, drv->reg_data->avs_limit);
 	spm_register_write(drv, SPM_REG_CFG, drv->reg_data->spm_cfg);
 	spm_register_write(drv, SPM_REG_DLY, drv->reg_data->spm_dly);
 	spm_register_write(drv, SPM_REG_PMIC_DLY, drv->reg_data->pmic_dly);
@@ -551,6 +810,28 @@ static int spm_dev_probe(struct platform_device *pdev)
 	/* Set up Standby as the default low power mode */
 	if (drv->reg_data->reg_offset[SPM_REG_SPM_CTL])
 		spm_set_low_power_mode(drv, PM_SLEEP_MODE_STBY);
+
+	/*
+	 * MSM8974 gang rail: put the SMPS into its heavy-load configuration
+	 * (PWM mode, all four phases) once at boot.  The bootloader leaves the
+	 * buck in a light-load configuration; it holds up under idle and
+	 * frequency transitions, but sustained multi-core load draws more
+	 * current than that configuration can supply and the SoC-side rail
+	 * droops into a silent PS_HOLD reset while VBAT stays healthy
+	 * (measured: identical 4-core load dies in seconds to minutes in the
+	 * boot configuration and runs indefinitely in PWM/4-phase).  The vendor
+	 * reaches the same state through its per-transition phase management;
+	 * setting it statically avoids that machinery (a per-transition port
+	 * write A/B-tested worse here) at the cost of PFM idle efficiency.
+	 */
+	if (drv->reg_data == &spm_reg_8974_8084_l2) {
+		if (spm_saw_write_pmic_port(drv, SPM_SAW_FTS_PORT, SPM_FTS_PWM))
+			dev_warn(&pdev->dev, "failed to set the SMPS to PWM\n");
+		udelay(50);	/* PFM -> PWM exit settle */
+		if (spm_saw_write_pmic_port(drv, SPM_SAW_PHASE_PORT, 3))
+			dev_warn(&pdev->dev, "failed to set 4-phase mode\n");
+		udelay(50);	/* phase-count raise settle */
+	}
 
 	if (IS_ENABLED(CONFIG_REGULATOR))
 		return spm_register_regulator(&pdev->dev, drv);
