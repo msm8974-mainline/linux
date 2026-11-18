@@ -1659,6 +1659,7 @@ static void wcn36xx_remove(struct platform_device *pdev)
 
 	release_firmware(wcn->nv);
 
+	WRITE_ONCE(wcn->removing, true);
 	ieee80211_unregister_hw(hw);
 
 	qcom_smem_state_put(wcn->tx_enable_state);

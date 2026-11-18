@@ -276,6 +276,10 @@ struct wcn36xx {
 	spinlock_t	dxe_lock;
 	bool                    queues_stopped;
 
+	/* Set in remove; a HAL timeout then means the firmware is gone. */
+	bool			removing;
+	bool			fw_dead;
+
 	/* Memory pools */
 	struct wcn36xx_dxe_mem_pool mgmt_mem_pool;
 	struct wcn36xx_dxe_mem_pool data_mem_pool;

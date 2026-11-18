@@ -427,6 +427,12 @@ static int wcn36xx_smd_send_and_wait(struct wcn36xx *wcn, size_t len)
 		(struct wcn36xx_hal_msg_header *)wcn->hal_buf;
 	u16 req_type = hdr->msg_type;
 
+	/* After a WCNSS crash every teardown command would wait the full
+	 * timeout; one is enough to know nobody will answer.
+	 */
+	if (wcn->fw_dead)
+		return -ETIME;
+
 	wcn36xx_dbg_dump(WCN36XX_DBG_SMD_DUMP, "HAL >>> ", wcn->hal_buf, len);
 
 	init_completion(&wcn->hal_rsp_compl);
@@ -440,6 +446,8 @@ static int wcn36xx_smd_send_and_wait(struct wcn36xx *wcn, size_t len)
 		msecs_to_jiffies(HAL_MSG_TIMEOUT)) <= 0) {
 		wcn36xx_err("Timeout! No SMD response to req %d in %dms\n",
 			    req_type, HAL_MSG_TIMEOUT);
+		if (READ_ONCE(wcn->removing))
+			wcn->fw_dead = true;
 		ret = -ETIME;
 		goto out;
 	}
