@@ -552,14 +552,14 @@ static int wcn36xx_dxe_request_irqs(struct wcn36xx *wcn)
 {
 	int ret;
 
-	ret = request_irq(wcn->tx_irq, wcn36xx_irq_tx_complete,
-			  IRQF_TRIGGER_HIGH, "wcn36xx_tx", wcn);
+	ret = request_irq(wcn->tx_irq, wcn36xx_irq_tx_complete, 0,
+			  "wcn36xx_tx", wcn);
 	if (ret) {
 		wcn36xx_err("failed to alloc tx irq\n");
 		goto out_err;
 	}
 
-	ret = request_irq(wcn->rx_irq, wcn36xx_irq_rx_ready, IRQF_TRIGGER_HIGH,
+	ret = request_irq(wcn->rx_irq, wcn36xx_irq_rx_ready, 0,
 			  "wcn36xx_rx", wcn);
 	if (ret) {
 		wcn36xx_err("failed to alloc rx irq\n");
